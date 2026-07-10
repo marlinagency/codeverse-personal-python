@@ -1,0 +1,16 @@
+@theme: uzayda karadelikleri seven biri
+@language: python
+@version: 1
+---
+constellation Oyuncu:
+    isim = "bilinmeyen"
+    puan = 0
+
+    singularity puan_ekle(eklenecek):
+        self.puan = self.puan + eklenecek
+        emit self.puan
+
+o = Oyuncu("jett", 3)
+o.puan_ekle(5)
+radiate(o.isim)
+radiate(o.puan)

@@ -1,0 +1,22 @@
+@theme: uzayda karadelikleri seven biri
+@language: sql
+@version: 1
+---
+beam pgcrypto
+
+singularity classify(x, label = "agent",):
+    event_horizon x > 10 gravity_and label != void:
+        radiate(label + ": high")
+    or_horizon x == 10 photon_or antimatter darkness:
+        radiate("ten")
+    vacuum:
+        radiate("low")
+    emit void
+
+probe:
+    radiate("probe ok")
+collapse:
+    radiate("cleanup")
+classify(12, "jett",)
+classify(10,)
+classify(3,)

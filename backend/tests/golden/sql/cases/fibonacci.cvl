@@ -1,0 +1,13 @@
+@theme: uzayda karadelikleri seven biri
+@language: sql
+@version: 1
+---
+singularity fib(n):
+    event_horizon n <= 1:
+        emit n
+    emit fib(n - 1) + fib(n - 2)
+
+sonuclar = []
+orbit i around lightyears(10):
+    sonuclar.accrete(fib(i))
+radiate(sonuclar)

@@ -1,0 +1,27 @@
+@theme: uzayda karadelikleri seven biri
+@language: python
+@version: 1
+---
+singularity guvenli_bolme(a, b):
+    probe:
+        emit a / b
+    hawking_catch hata:
+        radiate("hata yakalandi")
+        emit void
+
+radiate(guvenli_bolme(10, 2))
+radiate(guvenli_bolme(1, 0))
+
+sayac = 0
+spin_while lightspeed:
+    sayac = sayac + 1
+    event_horizon sayac >= 3:
+        escape
+radiate(sayac)
+
+toplam = 0
+orbit i around lightyears(1, 6):
+    event_horizon i % 2 == 0:
+        slingshot
+    toplam = toplam + i
+radiate(toplam)

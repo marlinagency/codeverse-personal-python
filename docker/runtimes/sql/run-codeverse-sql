@@ -1,0 +1,47 @@
+#!/bin/sh
+set -eu
+
+SCRIPT_PATH="${1:-/workspace/main.sql}"
+PGDATA="$(mktemp -d /tmp/codeverse-pgdata.XXXXXX)"
+SOCKET_DIR="$(mktemp -d /tmp/codeverse-pgsocket.XXXXXX)"
+LOG_FILE="$(mktemp /tmp/codeverse-postgres.XXXXXX.log)"
+
+cleanup() {
+  if [ -s "$LOG_FILE" ]; then
+    cat "$LOG_FILE" >&2
+  fi
+  pg_ctl -D "$PGDATA" -m fast -w stop >/dev/null 2>&1 || true
+  rm -rf "$PGDATA" "$SOCKET_DIR" "$LOG_FILE"
+}
+trap cleanup EXIT INT TERM
+
+initdb -D "$PGDATA" --auth=trust --username=postgres >/dev/null
+
+cat >> "$PGDATA/postgresql.conf" <<'EOF'
+listen_addresses = ''
+max_connections = 8
+shared_buffers = '16MB'
+temp_buffers = '8MB'
+work_mem = '4MB'
+maintenance_work_mem = '16MB'
+fsync = off
+synchronous_commit = off
+full_page_writes = off
+log_min_messages = warning
+client_min_messages = notice
+EOF
+
+pg_ctl -D "$PGDATA" \
+  -o "-k $SOCKET_DIR" \
+  -l "$LOG_FILE" \
+  -w start >/dev/null
+
+createdb -h "$SOCKET_DIR" -U postgres codeverse >/dev/null
+
+psql \
+  -h "$SOCKET_DIR" \
+  -U postgres \
+  -d codeverse \
+  -v ON_ERROR_STOP=1 \
+  -q \
+  -f "$SCRIPT_PATH"

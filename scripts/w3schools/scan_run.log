@@ -1,0 +1,51 @@
+2026-07-03 10:26:12,114 INFO python: 651 menü girdisi bulundu, sayfalar taranýyor...
+2026-07-03 10:26:24,644 INFO python: 25/651 sayfa tarandý
+2026-07-03 10:26:39,972 INFO python: 50/651 sayfa tarandý
+2026-07-03 10:27:00,786 INFO python: 75/651 sayfa tarandý
+2026-07-03 10:27:17,084 INFO python: 100/651 sayfa tarandý
+2026-07-03 10:27:34,005 INFO python: 125/651 sayfa tarandý
+2026-07-03 10:27:50,833 INFO python: 150/651 sayfa tarandý
+2026-07-03 10:28:07,411 INFO python: 175/651 sayfa tarandý
+2026-07-03 10:28:24,604 INFO python: 200/651 sayfa tarandý
+2026-07-03 10:28:51,846 INFO python: 225/651 sayfa tarandý
+2026-07-03 10:29:08,126 INFO python: 250/651 sayfa tarandý
+2026-07-03 10:29:37,188 WARNING atlandý (istek hatasý): https://www.w3schools.com/python/ref_func_input.asp — HTTPSConnectionPool(host='www.w3schools.com', port=443): Read timed out. (read timeout=15)
+2026-07-03 10:29:40,430 INFO python: 275/651 sayfa tarandý
+2026-07-03 10:30:00,903 INFO python: 300/651 sayfa tarandý
+2026-07-03 10:30:28,322 INFO python: 325/651 sayfa tarandý
+2026-07-03 10:30:45,498 INFO python: 350/651 sayfa tarandý
+2026-07-03 10:31:08,843 INFO python: 375/651 sayfa tarandý
+2026-07-03 10:31:26,310 INFO python: 400/651 sayfa tarandý
+2026-07-03 10:31:48,145 INFO python: 425/651 sayfa tarandý
+2026-07-03 10:32:14,338 WARNING atlandý (istek hatasý): https://www.w3schools.com/python/ref_keyword_pass.asp — HTTPSConnectionPool(host='www.w3schools.com', port=443): Read timed out. (read timeout=15)
+2026-07-03 10:32:26,746 INFO python: 450/651 sayfa tarandý
+2026-07-03 10:32:45,092 INFO python: 475/651 sayfa tarandý
+2026-07-03 10:33:08,436 INFO python: 500/651 sayfa tarandý
+2026-07-03 10:33:26,647 INFO python: 525/651 sayfa tarandý
+2026-07-03 10:33:50,038 INFO python: 550/651 sayfa tarandý
+2026-07-03 10:34:08,129 INFO python: 575/651 sayfa tarandý
+2026-07-03 10:34:34,604 INFO python: 600/651 sayfa tarandý
+2026-07-03 10:34:52,777 INFO python: 625/651 sayfa tarandý
+2026-07-03 10:35:08,223 INFO python: 650/651 sayfa tarandý
+2026-07-03 10:35:08,904 INFO python: 649 sayfa yazýldý -> C:\Users\enesc\Downloads\agent-of\scripts\w3schools\output\ham_python_menu.json (168 sayfada syntax bulundu)
+2026-07-03 10:35:09,405 INFO sql: 449 menü girdisi bulundu, sayfalar taranýyor...
+2026-07-03 10:35:24,540 INFO sql: 25/449 sayfa tarandý
+2026-07-03 10:35:39,327 INFO sql: 50/449 sayfa tarandý
+2026-07-03 10:35:55,253 INFO sql: 75/449 sayfa tarandý
+2026-07-03 10:36:11,352 WARNING atlandý (istek hatasý): https://www.w3schools.com/sql/sql_ref_and.asp — HTTPSConnectionPool(host='www.w3schools.com', port=443): Read timed out. (read timeout=15)
+2026-07-03 10:36:34,023 INFO sql: 100/449 sayfa tarandý
+2026-07-03 10:37:09,728 INFO sql: 125/449 sayfa tarandý
+2026-07-03 10:37:27,452 INFO sql: 150/449 sayfa tarandý
+2026-07-03 10:37:44,492 INFO sql: 175/449 sayfa tarandý
+2026-07-03 10:38:02,571 INFO sql: 200/449 sayfa tarandý
+2026-07-03 10:38:20,525 INFO sql: 225/449 sayfa tarandý
+2026-07-03 10:38:37,385 INFO sql: 250/449 sayfa tarandý
+2026-07-03 10:38:53,396 INFO sql: 275/449 sayfa tarandý
+2026-07-03 10:39:20,265 INFO sql: 300/449 sayfa tarandý
+2026-07-03 10:39:37,298 INFO sql: 325/449 sayfa tarandý
+2026-07-03 10:39:54,982 INFO sql: 350/449 sayfa tarandý
+2026-07-03 10:40:22,554 WARNING atlandý (istek hatasý): https://www.w3schools.com/sql/func_sqlserver_system_user.asp — HTTPSConnectionPool(host='www.w3schools.com', port=443): Read timed out. (read timeout=15)
+2026-07-03 10:40:25,663 INFO sql: 375/449 sayfa tarandý
+2026-07-03 10:40:43,156 INFO sql: 400/449 sayfa tarandý
+2026-07-03 10:41:00,492 INFO sql: 425/449 sayfa tarandý
+2026-07-03 10:41:16,751 INFO sql: 447 sayfa yazýldý -> C:\Users\enesc\Downloads\agent-of\scripts\w3schools\output\ham_sql_menu.json (328 sayfada syntax bulundu)

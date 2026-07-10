@@ -1,0 +1,25 @@
+@theme: uzayda karadelikleri seven biri
+@language: python
+@version: 1
+---
+beam math
+
+singularity classify(x, label = "agent",):
+    event_horizon x > 10 gravity_and label != void:
+        radiate(label + ": high")
+    or_horizon x == 10 photon_or antimatter darkness:
+        radiate("ten")
+    vacuum:
+        radiate("low")
+    emit void
+
+values = [1, 2,]
+probe:
+    radiate("probe ok")
+collapse:
+    radiate("cleanup")
+classify(12, "jett",)
+classify(10,)
+classify(3,)
+radiate(math.sqrt(16))
+radiate(values)

@@ -1,0 +1,22 @@
+@theme: uzayda karadelikleri seven biri
+@language: python
+@version: 1
+---
+skorlar = {"jett": 10, "sage": 5}
+skorlar.chart("omen", 8)
+radiate(mass(skorlar))
+radiate(skorlar.observe("jett"))
+event_horizon skorlar.captures("sage"):
+    radiate("sage takimda")
+skorlar.evaporate("sage")
+radiate(skorlar.coordinates())
+radiate(skorlar.readings())
+
+liste = [3, 1]
+liste.accrete(2)
+liste.eject(3)
+radiate(liste)
+radiate(liste[0])
+radiate(mass(liste))
+liste[0] = 9
+radiate(liste)

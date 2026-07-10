@@ -1,0 +1,47 @@
+2026-07-03 10:49:47,270 INFO python: 651 menü girdisi bulundu, sayfalar taranýyor...
+2026-07-03 10:49:59,229 INFO python: 25/651 sayfa tarandý
+2026-07-03 10:50:11,703 INFO python: 50/651 sayfa tarandý
+2026-07-03 10:50:24,999 INFO python: 75/651 sayfa tarandý
+2026-07-03 10:50:38,185 INFO python: 100/651 sayfa tarandý
+2026-07-03 10:50:52,074 INFO python: 125/651 sayfa tarandý
+2026-07-03 10:51:06,230 INFO python: 150/651 sayfa tarandý
+2026-07-03 10:51:19,951 INFO python: 175/651 sayfa tarandý
+2026-07-03 10:51:34,270 INFO python: 200/651 sayfa tarandý
+2026-07-03 10:51:47,824 INFO python: 225/651 sayfa tarandý
+2026-07-03 10:52:00,594 INFO python: 250/651 sayfa tarandý
+2026-07-03 10:52:14,508 INFO python: 275/651 sayfa tarandý
+2026-07-03 10:52:28,245 INFO python: 300/651 sayfa tarandý
+2026-07-03 10:52:41,701 INFO python: 325/651 sayfa tarandý
+2026-07-03 10:52:56,157 INFO python: 350/651 sayfa tarandý
+2026-07-03 10:53:10,699 INFO python: 375/651 sayfa tarandý
+2026-07-03 10:53:24,162 INFO python: 400/651 sayfa tarandý
+2026-07-03 10:53:37,417 INFO python: 425/651 sayfa tarandý
+2026-07-03 10:53:50,555 INFO python: 450/651 sayfa tarandý
+2026-07-03 10:54:03,352 INFO python: 475/651 sayfa tarandý
+2026-07-03 10:54:16,872 INFO python: 500/651 sayfa tarandý
+2026-07-03 10:54:30,050 INFO python: 525/651 sayfa tarandý
+2026-07-03 10:54:43,489 INFO python: 550/651 sayfa tarandý
+2026-07-03 10:54:56,369 INFO python: 575/651 sayfa tarandý
+2026-07-03 10:55:09,730 INFO python: 600/651 sayfa tarandý
+2026-07-03 10:55:23,117 INFO python: 625/651 sayfa tarandý
+2026-07-03 10:55:37,600 INFO python: 650/651 sayfa tarandý
+2026-07-03 10:55:38,146 INFO python: 651 sayfa yazýldý -> C:\Users\enesc\Downloads\agent-of\scripts\w3schools\output\ham_python_menu.json (169 sayfada syntax bulundu)
+2026-07-03 10:55:38,614 INFO sql: 449 menü girdisi bulundu, sayfalar taranýyor...
+2026-07-03 10:55:53,168 INFO sql: 25/449 sayfa tarandý
+2026-07-03 10:56:08,250 INFO sql: 50/449 sayfa tarandý
+2026-07-03 10:56:21,944 INFO sql: 75/449 sayfa tarandý
+2026-07-03 10:56:35,583 INFO sql: 100/449 sayfa tarandý
+2026-07-03 10:56:48,764 INFO sql: 125/449 sayfa tarandý
+2026-07-03 10:57:02,184 INFO sql: 150/449 sayfa tarandý
+2026-07-03 10:57:16,140 INFO sql: 175/449 sayfa tarandý
+2026-07-03 10:57:29,586 INFO sql: 200/449 sayfa tarandý
+2026-07-03 10:57:42,961 INFO sql: 225/449 sayfa tarandý
+2026-07-03 10:57:56,482 INFO sql: 250/449 sayfa tarandý
+2026-07-03 10:58:10,632 INFO sql: 275/449 sayfa tarandý
+2026-07-03 10:58:24,601 INFO sql: 300/449 sayfa tarandý
+2026-07-03 10:58:38,681 INFO sql: 325/449 sayfa tarandý
+2026-07-03 10:58:52,900 INFO sql: 350/449 sayfa tarandý
+2026-07-03 10:59:07,639 INFO sql: 375/449 sayfa tarandý
+2026-07-03 10:59:28,655 INFO sql: 400/449 sayfa tarandý
+2026-07-03 10:59:50,339 INFO sql: 425/449 sayfa tarandý
+2026-07-03 11:00:25,708 INFO sql: 449 sayfa yazýldý -> C:\Users\enesc\Downloads\agent-of\scripts\w3schools\output\ham_sql_menu.json (329 sayfada syntax bulundu)

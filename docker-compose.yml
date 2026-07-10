@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: codeverse
+      POSTGRES_PASSWORD: codeverse
+      POSTGRES_DB: codeverse
+    ports:
+      - "5432:5432"
+    volumes:
+      - codeverse-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codeverse -d codeverse"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      CODEVERSE_DATABASE_URL: postgresql+psycopg://codeverse:codeverse@postgres:5432/codeverse
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The sandbox execution layer shells out to the HOST Docker daemon so
+    # generated user code runs in ITS OWN sibling containers, never inside
+    # this backend container. Mounting the host socket is required for that.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  codeverse-pgdata:

@@ -1,0 +1,27 @@
+# secrets — NEVER commit real keys; .env.example is the committed template
+.env
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# node
+frontend/node_modules/
+frontend/dist/
+
+# local data / scratch
+codeverse.db
+.tmp/
+amd/*.jsonl
+
+# editors / os
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# build artifacts
+backend/src/codeverse.egg-info/
