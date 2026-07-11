@@ -45,6 +45,17 @@ class PracticeTaskOut(BaseModel):
     explanation: str = ""
 
 
+class LessonSectionOut(BaseModel):
+    section_id: str
+    title: str
+    objective: str
+    explanation: str
+    key_points: list[str]
+    personal_example: str
+    real_python_example: str
+    expected_output: str
+
+
 class LearningModuleOut(BaseModel):
     module_id: str
     title: str
@@ -53,6 +64,7 @@ class LearningModuleOut(BaseModel):
     concepts: list[LearningConceptOut]
     bridge_steps: list[str]
     lesson_steps: list[str]
+    lesson_sections: list[LessonSectionOut]
     misconception_checks: list[str]
     success_criteria: list[str]
     source_content: str

@@ -50,6 +50,18 @@ class PracticeTask:
 
 
 @dataclass(frozen=True)
+class LessonSection:
+    section_id: str
+    title: str
+    objective: str
+    explanation: str
+    key_points: tuple[str, ...]
+    personal_example: str
+    real_python_example: str
+    expected_output: str
+
+
+@dataclass(frozen=True)
 class LearningModule:
     module_id: str
     title: str
@@ -58,6 +70,7 @@ class LearningModule:
     concepts: tuple[LearningConcept, ...]
     bridge_steps: tuple[str, ...]
     lesson_steps: tuple[str, ...]
+    lesson_sections: tuple[LessonSection, ...]
     misconception_checks: tuple[str, ...]
     success_criteria: tuple[str, ...]
     source_content: str
@@ -136,6 +149,9 @@ _PAIN_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("collections", ("list", "dict", "array", "dictionary", "liste", "sözlük", "sozluk")),
     ("errors", ("try", "except", "error", "hata")),
     ("classes", ("class", "object", "oop", "nesne", "sınıf", "sinif")),
+    ("files", ("file", "files", "open", "read", "write", "dosya")),
+    ("numbers", ("number", "numbers", "int", "float", "round", "math", "sayi")),
+    ("imports", ("import", "module", "library", "package", "kutuphane", "modul")),
 )
 
 _MODULE_BLUEPRINTS: tuple[dict[str, Any], ...] = (
@@ -145,6 +161,34 @@ _MODULE_BLUEPRINTS: tuple[dict[str, Any], ...] = (
         "goal": "Print values, name data, and see immediate output.",
         "why": "Beginners need fast visible feedback before abstract syntax feels useful.",
         "concept_ids": ("py_fn_print",),
+    },
+    {
+        "module_id": "strings-and-text",
+        "title": "Strings and Text",
+        "goal": "Clean, transform, replace, and split text with Python string methods.",
+        "why": "Text is everywhere in real programs: names, messages, files, APIs, and model prompts.",
+        "concept_ids": (
+            "py_fn_str",
+            "py_str_strip",
+            "py_str_replace",
+            "py_str_upper",
+            "py_str_lower",
+            "py_str_split",
+        ),
+    },
+    {
+        "module_id": "numbers-and-conversion",
+        "title": "Numbers and Conversion",
+        "goal": "Convert numeric text and use common numeric functions in reliable calculations.",
+        "why": "Inputs, files, and APIs often provide numbers as text that must be converted before calculation.",
+        "concept_ids": ("py_fn_int", "py_fn_float", "py_fn_round", "py_fn_abs", "py_fn_pow"),
+    },
+    {
+        "module_id": "imports-and-library",
+        "title": "Imports and Standard Library",
+        "goal": "Import modules, select individual tools, and create clear local aliases.",
+        "why": "Real Python projects reuse tested standard-library tools instead of rebuilding every capability.",
+        "concept_ids": ("py_kw_import", "py_kw_from", "py_kw_as"),
     },
     {
         "module_id": "choices",
@@ -196,6 +240,20 @@ _MODULE_BLUEPRINTS: tuple[dict[str, Any], ...] = (
         "concept_ids": ("py_fn_list", "py_fn_dict", "py_list_append", "py_dict_get", "py_fn_len"),
     },
     {
+        "module_id": "tuples-and-sets",
+        "title": "Tuples and Sets",
+        "goal": "Use tuples for stable ordered records and sets for unique values.",
+        "why": "Programs often need both data that keeps its shape and data that automatically removes duplicates.",
+        "concept_ids": ("py_fn_tuple", "py_fn_set", "py_set_add", "py_set_discard", "py_set_union", "py_kw_in"),
+    },
+    {
+        "module_id": "files-and-context",
+        "title": "Files and Context Managers",
+        "goal": "Open, write, and read text files while closing resources safely.",
+        "why": "Programs persist notes, settings, datasets, and results in files that must be handled reliably.",
+        "concept_ids": ("py_kw_with", "py_kw_as", "py_fn_open", "py_file_write", "py_file_read"),
+    },
+    {
         "module_id": "errors",
         "title": "Safe Attempts",
         "goal": "Understand try, except, and finally as a safe execution path.",
@@ -213,6 +271,19 @@ _MODULE_BLUEPRINTS: tuple[dict[str, Any], ...] = (
 
 _CONCEPT_COPY: dict[str, tuple[str, str, str]] = {
     "py_fn_print": ("print", "Output", "Send a value to the screen so you can observe the program."),
+    "py_fn_str": ("str", "Text conversion", "Convert a value into text so it can join other strings."),
+    "py_str_strip": ("strip", "Trim text", "Remove whitespace from both ends of a string."),
+    "py_str_replace": ("replace", "Replace text", "Swap one piece of text for another without changing the original string."),
+    "py_str_upper": ("upper", "Uppercase text", "Create an uppercase version of a string."),
+    "py_str_lower": ("lower", "Lowercase text", "Create a lowercase version of a string."),
+    "py_str_split": ("split", "Split text", "Break a string into a list of smaller strings."),
+    "py_fn_int": ("int", "Integer conversion", "Convert a compatible value into a whole number."),
+    "py_fn_float": ("float", "Decimal conversion", "Convert a compatible value into a floating-point number."),
+    "py_fn_round": ("round", "Rounded number", "Round a number to a requested precision."),
+    "py_fn_abs": ("abs", "Absolute value", "Measure a number's distance from zero without its sign."),
+    "py_fn_pow": ("pow", "Power", "Raise a number to an exponent and return the result."),
+    "py_kw_import": ("import", "Import module", "Load a module so its public tools can be used."),
+    "py_kw_from": ("from", "Import from module", "Select a named tool from a module."),
     "py_kw_if": ("if", "First condition", "Run a block only when a condition is true."),
     "py_kw_elif": ("elif", "Second condition", "Try another condition when the first one fails."),
     "py_kw_else": ("else", "Fallback", "Run a final block when no previous condition matched."),
@@ -235,6 +306,16 @@ _CONCEPT_COPY: dict[str, tuple[str, str, str]] = {
     "py_list_append": ("append", "Add to list", "Place a new value at the end of a list."),
     "py_dict_get": ("get", "Read from dictionary", "Read a value by key with a safe fallback."),
     "py_fn_len": ("len", "Length", "Count how many items a collection contains."),
+    "py_fn_tuple": ("tuple", "Fixed sequence", "Store an ordered sequence whose items cannot be replaced in place."),
+    "py_fn_set": ("set", "Unique collection", "Store unique values without relying on a fixed display order."),
+    "py_set_add": ("add", "Add unique value", "Add one value to a set while preserving uniqueness."),
+    "py_set_discard": ("discard", "Safely remove value", "Remove a value from a set without failing when it is absent."),
+    "py_set_union": ("union", "Combine sets", "Create a set containing the unique values from both sets."),
+    "py_kw_with": ("with", "Managed resource", "Enter a context that cleans up its resource when the block ends."),
+    "py_kw_as": ("as", "Local alias", "Bind an imported tool or managed resource to a clear local name."),
+    "py_fn_open": ("open", "Open file", "Open a path in an explicit read or write mode."),
+    "py_file_write": ("write", "Write text", "Store text in an open file and advance its cursor."),
+    "py_file_read": ("read", "Read text", "Load text from the current position of an open file."),
     "py_kw_try": ("try", "Safe attempt", "Run code that might fail."),
     "py_kw_except": ("except", "Error handler", "Respond when the try block fails."),
     "py_kw_finally": ("finally", "Cleanup", "Run cleanup after try or except."),
@@ -243,6 +324,19 @@ _CONCEPT_COPY: dict[str, tuple[str, str, str]] = {
 
 _FALLBACK_TOKENS: dict[str, str] = {
     "py_fn_print": "print",
+    "py_fn_str": "str",
+    "py_str_strip": "strip",
+    "py_str_replace": "replace",
+    "py_str_upper": "upper",
+    "py_str_lower": "lower",
+    "py_str_split": "split",
+    "py_fn_int": "int",
+    "py_fn_float": "float",
+    "py_fn_round": "round",
+    "py_fn_abs": "abs",
+    "py_fn_pow": "pow",
+    "py_kw_import": "import",
+    "py_kw_from": "from",
     "py_kw_if": "if",
     "py_kw_elif": "elif",
     "py_kw_else": "else",
@@ -265,6 +359,16 @@ _FALLBACK_TOKENS: dict[str, str] = {
     "py_list_append": "append",
     "py_dict_get": "get",
     "py_fn_len": "len",
+    "py_fn_tuple": "tuple",
+    "py_fn_set": "set",
+    "py_set_add": "add",
+    "py_set_discard": "discard",
+    "py_set_union": "union",
+    "py_kw_with": "with",
+    "py_kw_as": "as",
+    "py_fn_open": "open",
+    "py_file_write": "write",
+    "py_file_read": "read",
     "py_kw_try": "try",
     "py_kw_except": "except",
     "py_kw_finally": "finally",
@@ -445,6 +549,7 @@ def _build_module(dictionary: Any, blueprint: dict[str, Any], order: int) -> Lea
         concepts=concepts,
         bridge_steps=_bridge_steps(concepts),
         lesson_steps=_lesson_steps(module_id, concepts),
+        lesson_sections=_lesson_sections(module_id, dictionary),
         misconception_checks=_misconception_checks(module_id),
         success_criteria=_success_criteria(module_id),
         source_content=_module_source(dictionary, module_id),
@@ -479,6 +584,33 @@ def _module_source(dictionary: Any, module_id: str) -> str:
 
     if module_id == "signals-and-values":
         return header + f'{t["py_fn_print"]}("Personal Python ready")\ncv_score = 7\n{t["py_fn_print"]}(cv_score)\n'
+
+    if module_id == "strings-and-text":
+        return header + (
+            'cv_message = "  codeverse, python  "\n'
+            f'cv_clean = cv_message.{t["py_str_strip"]}().{t["py_str_replace"]}(",", "").{t["py_str_upper"]}()\n'
+            f'{t["py_fn_print"]}(cv_clean)\n'
+            f'cv_words = cv_clean.{t["py_str_lower"]}().{t["py_str_split"]}()\n'
+            f'{t["py_fn_print"]}(cv_words)\n'
+            f'{t["py_fn_print"]}({t["py_fn_str"]}(2026))\n'
+        )
+
+    if module_id == "numbers-and-conversion":
+        return header + (
+            f'cv_price = {t["py_fn_float"]}("12.5")\n'
+            f'cv_count = {t["py_fn_int"]}("3")\n'
+            f'{t["py_fn_print"]}({t["py_fn_round"]}(cv_price * cv_count, 1))\n'
+            f'{t["py_fn_print"]}({t["py_fn_abs"]}(-8))\n'
+            f'{t["py_fn_print"]}({t["py_fn_pow"]}(2, 3))\n'
+        )
+
+    if module_id == "imports-and-library":
+        return header + (
+            f'{t["py_kw_import"]} math {t["py_kw_as"]} cv_math\n'
+            f'{t["py_fn_print"]}(cv_math.sqrt(81))\n'
+            f'{t["py_kw_from"]} statistics {t["py_kw_import"]} mean {t["py_kw_as"]} cv_mean\n'
+            f'{t["py_fn_print"]}(cv_mean([2, 4, 6]))\n'
+        )
 
     if module_id == "choices":
         return header + (
@@ -537,6 +669,28 @@ def _module_source(dictionary: Any, module_id: str) -> str:
             f'{t["py_fn_print"]}({t["py_fn_len"]}(cv_scores))\n'
         )
 
+    if module_id == "tuples-and-sets":
+        return header + (
+            f'cv_route = {t["py_fn_tuple"]}(["dock", "market"])\n'
+            f'cv_tags = {t["py_fn_set"]}(["red", "blue", "red"])\n'
+            f'cv_tags.{t["py_set_add"]}("green")\n'
+            f'cv_tags.{t["py_set_discard"]}("blue")\n'
+            f'cv_backup = {t["py_fn_set"]}(["yellow"])\n'
+            f'cv_all = cv_tags.{t["py_set_union"]}(cv_backup)\n'
+            f'{t["py_fn_print"]}(cv_route)\n'
+            f'{t["py_fn_print"]}({t["py_fn_len"]}(cv_all))\n'
+            f'{t["py_fn_print"]}("red" {t["py_kw_in"]} cv_all)\n'
+        )
+
+    if module_id == "files-and-context":
+        return header + (
+            f'{t["py_kw_with"]} {t["py_fn_open"]}("cv_lesson_note.txt", "w") {t["py_kw_as"]} cv_file:\n'
+            f'    cv_file.{t["py_file_write"]}("Python files stay safe")\n'
+            f'{t["py_kw_with"]} {t["py_fn_open"]}("cv_lesson_note.txt", "r") {t["py_kw_as"]} cv_file:\n'
+            f'    cv_note = cv_file.{t["py_file_read"]}()\n'
+            f'    {t["py_fn_print"]}(cv_note)\n'
+        )
+
     if module_id == "objects":
         return header + (
             f'{t["py_kw_class"]} CvLearner:\n'
@@ -582,6 +736,105 @@ def _module_tasks(module_id: str, dictionary: Any) -> tuple[PracticeTask, ...]:
                 expected_answer="print",
                 hint="The token is the visible-output concept.",
                 explanation="Personal tokens must always bridge back to real Python concepts.",
+            ),
+            PracticeTask(
+                id="signals-number-expression",
+                kind="predict_output",
+                concept_id="py_fn_print",
+                prompt="What does print(7 + 1) display?",
+                expected_answer="8",
+                choices=("8", "71", "7 + 1"),
+                hint="Python evaluates the arithmetic expression before printing its result.",
+                explanation="The integers are added first, so print receives the value 8.",
+            ),
+            PracticeTask(
+                id="signals-variable-update",
+                kind="predict_output",
+                concept_id="py_fn_print",
+                prompt="After cv_score = 7 followed by cv_score = 9, what does print(cv_score) display?",
+                expected_answer="9",
+                choices=("9", "7", "cv_score"),
+                hint="The second assignment replaces the value associated with the name.",
+                explanation="A variable read uses its most recently assigned value.",
+            ),
+            PracticeTask(
+                id="signals-multiple-values",
+                kind="predict_output",
+                concept_id="py_fn_print",
+                prompt='What does print("score:", 12) display?',
+                expected_answer="score: 12",
+                choices=("score: 12", "score:12", "12 score:"),
+                hint="print inserts one space between comma-separated arguments by default.",
+                explanation="Multiple print arguments are displayed in order with a space separator.",
+            ),
+        )
+    if module_id == "strings-and-text":
+        return (
+            PracticeTask(
+                id="strings-clean",
+                kind="concept_reasoning",
+                concept_id="py_str_strip",
+                prompt="What does strip remove when called without arguments?",
+                expected_answer="whitespace at both ends",
+                choices=("all spaces everywhere", "whitespace at both ends", "punctuation"),
+                hint="It works on the outside edges, not the middle of the text.",
+                explanation="strip removes leading and trailing whitespace while preserving internal spaces.",
+            ),
+            PracticeTask(
+                id="strings-translate",
+                kind="translate_token",
+                concept_id="py_str_upper",
+                prompt=f"Which real Python method does `{t['py_str_upper']}` bridge to?",
+                expected_answer="upper",
+                choices=("split", "replace", "upper"),
+                hint="This method creates the all-capitals version of a string.",
+                explanation="str.upper returns a new uppercase string; it does not mutate the original.",
+            ),
+        )
+    if module_id == "numbers-and-conversion":
+        return (
+            PracticeTask(
+                id="numbers-int-truncation",
+                kind="predict_output",
+                concept_id="py_fn_int",
+                prompt="What whole number does int(3.9) produce?",
+                expected_answer="3",
+                choices=("3", "4", "3.9"),
+                hint="Integer conversion removes the fractional part; it does not round to the nearest number.",
+                explanation="int(3.9) truncates toward zero and produces 3.",
+            ),
+            PracticeTask(
+                id="numbers-absolute-value",
+                kind="predict_output",
+                concept_id="py_fn_abs",
+                prompt="What value does abs(-8) return?",
+                expected_answer="8",
+                choices=("8", "-8", "0"),
+                hint="Absolute value is the distance from zero.",
+                explanation="The distance between -8 and zero is 8.",
+            ),
+        )
+    if module_id == "imports-and-library":
+        return (
+            PracticeTask(
+                id="imports-module-access",
+                kind="concept_reasoning",
+                concept_id="py_kw_import",
+                prompt="After import math as cv_math, how do you access square root?",
+                expected_answer="cv_math.sqrt",
+                choices=("cv_math.sqrt", "sqrt.cv_math", "math import sqrt"),
+                hint="Use the local module name, then a dot, then the tool name.",
+                explanation="A module alias becomes the namespace used to access that module's members.",
+            ),
+            PracticeTask(
+                id="imports-from-purpose",
+                kind="concept_reasoning",
+                concept_id="py_kw_from",
+                prompt="What does from statistics import mean place in the current scope?",
+                expected_answer="mean",
+                choices=("mean", "every statistics tool", "a copied statistics file"),
+                hint="The statement selects one named member.",
+                explanation="from-import binds the selected member directly in the current module.",
             ),
         )
     if module_id == "choices":
@@ -696,6 +949,52 @@ def _module_tasks(module_id: str, dictionary: Any) -> tuple[PracticeTask, ...]:
                 explanation="dict.get reads a value by key.",
             ),
         )
+    if module_id == "tuples-and-sets":
+        return (
+            PracticeTask(
+                id="tuples-fixed-record",
+                kind="concept_reasoning",
+                concept_id="py_fn_tuple",
+                prompt="Which collection is designed for a fixed, ordered record?",
+                expected_answer="tuple",
+                choices=("tuple", "set", "dict"),
+                hint="Its order is stable, but its items cannot be replaced in place.",
+                explanation="A tuple is an ordered, immutable sequence that works well for stable records.",
+            ),
+            PracticeTask(
+                id="sets-unique-count",
+                kind="predict_output",
+                concept_id="py_fn_set",
+                prompt='How many values remain in set(["red", "blue", "red"])?',
+                expected_answer="2",
+                choices=("2", "3", "1"),
+                hint="A set keeps only one copy of each equal value.",
+                explanation="The repeated red value is removed, leaving red and blue.",
+            ),
+        )
+    if module_id == "files-and-context":
+        return (
+            PracticeTask(
+                id="files-write-mode",
+                kind="concept_reasoning",
+                concept_id="py_fn_open",
+                prompt="Which open mode creates a text file or replaces its existing contents?",
+                expected_answer="w",
+                choices=("w", "r", "a"),
+                hint="This mode begins a fresh write operation.",
+                explanation="Mode w opens a file for writing and truncates existing contents.",
+            ),
+            PracticeTask(
+                id="files-context-cleanup",
+                kind="concept_reasoning",
+                concept_id="py_kw_with",
+                prompt="What does with guarantee when the file block ends?",
+                expected_answer="the file is closed",
+                choices=("the file is closed", "the file is deleted", "the text is printed"),
+                hint="Think about resource cleanup, including when an error occurs.",
+                explanation="The context manager closes the file automatically when control leaves the with block.",
+            ),
+        )
     if module_id == "objects":
         return (
             PracticeTask(
@@ -745,6 +1044,56 @@ _CODE_TASK_SPECS: dict[str, dict[str, Any]] = {
         "solution": lambda t: (
             f'{t["py_fn_print"]}("hello")\n'
             f'{t["py_fn_print"]}(12)\n'
+        ),
+    },
+    "strings-and-text": {
+        "id": "strings-code",
+        "concept_id": "py_str_replace",
+        "prompt": 'Complete the text pipeline so it prints exactly "CODEVERSE PYTHON".',
+        "expected_stdout": "CODEVERSE PYTHON\n",
+        "hint": "Trim the edges, replace the comma with a space, then convert the result to uppercase.",
+        "explanation": "String methods can be chained because each method returns a new string.",
+        "starter": lambda t: (
+            'cv_text = "  codeverse,python  "\n'
+            f'cv_clean = cv_text.{t["py_str_strip"]}()  # TODO: replace the comma and uppercase the result\n'
+            f'{t["py_fn_print"]}(cv_clean)\n'
+        ),
+        "solution": lambda t: (
+            'cv_text = "  codeverse,python  "\n'
+            f'cv_clean = cv_text.{t["py_str_strip"]}().{t["py_str_replace"]}(",", " ").{t["py_str_upper"]}()\n'
+            f'{t["py_fn_print"]}(cv_clean)\n'
+        ),
+    },
+    "numbers-and-conversion": {
+        "id": "numbers-and-conversion-code",
+        "concept_id": "py_fn_int",
+        "prompt": 'Use integer conversion so adding 9 prints exactly "30" instead of "30.0".',
+        "expected_stdout": "30\n",
+        "hint": "Replace the decimal conversion token with your whole-number conversion token.",
+        "explanation": "int converts compatible numeric text into an integer that participates in numeric addition.",
+        "starter": lambda t: (
+            f'cv_value = {t["py_fn_float"]}("21")  # TODO: convert to a whole number instead\n'
+            f'{t["py_fn_print"]}(cv_value + 9)\n'
+        ),
+        "solution": lambda t: (
+            f'cv_value = {t["py_fn_int"]}("21")\n'
+            f'{t["py_fn_print"]}(cv_value + 9)\n'
+        ),
+    },
+    "imports-and-library": {
+        "id": "imports-and-library-code",
+        "concept_id": "py_kw_from",
+        "prompt": 'Import sqrt instead of floor so the program prints exactly "9.0".',
+        "expected_stdout": "9.0\n",
+        "hint": "Keep the alias cv_calculate, but select sqrt from math.",
+        "explanation": "A from-import can swap the selected standard-library tool while preserving a useful local alias.",
+        "starter": lambda t: (
+            f'{t["py_kw_from"]} math {t["py_kw_import"]} floor {t["py_kw_as"]} cv_calculate\n'
+            f'{t["py_fn_print"]}(cv_calculate(81))\n'
+        ),
+        "solution": lambda t: (
+            f'{t["py_kw_from"]} math {t["py_kw_import"]} sqrt {t["py_kw_as"]} cv_calculate\n'
+            f'{t["py_fn_print"]}(cv_calculate(81))\n'
         ),
     },
     "choices": {
@@ -866,6 +1215,48 @@ _CODE_TASK_SPECS: dict[str, dict[str, Any]] = {
             f'cv_scores = {t["py_fn_list"]}([100])\n'
             f'cv_scores.{t["py_list_append"]}(150)\n'
             f'{t["py_fn_print"]}({t["py_fn_len"]}(cv_scores))\n'
+        ),
+    },
+    "tuples-and-sets": {
+        "id": "tuples-and-sets-code",
+        "concept_id": "py_set_add",
+        "prompt": 'Add "green" to the unique tags so the program prints 3 and then True.',
+        "expected_stdout": "3\nTrue\n",
+        "hint": "Use your add-to-set token on cv_tags before the two output lines.",
+        "explanation": "set.add inserts a new unique value; membership then confirms that it is present.",
+        "starter": lambda t: (
+            f'cv_tags = {t["py_fn_set"]}(["red", "blue", "red"])\n'
+            '# TODO: add "green" to cv_tags\n'
+            f'{t["py_fn_print"]}({t["py_fn_len"]}(cv_tags))\n'
+            f'{t["py_fn_print"]}("green" {t["py_kw_in"]} cv_tags)\n'
+        ),
+        "solution": lambda t: (
+            f'cv_tags = {t["py_fn_set"]}(["red", "blue", "red"])\n'
+            f'cv_tags.{t["py_set_add"]}("green")\n'
+            f'{t["py_fn_print"]}({t["py_fn_len"]}(cv_tags))\n'
+            f'{t["py_fn_print"]}("green" {t["py_kw_in"]} cv_tags)\n'
+        ),
+    },
+    "files-and-context": {
+        "id": "files-and-context-code",
+        "concept_id": "py_file_read",
+        "prompt": 'Read the saved file into cv_message so the program prints exactly "saved".',
+        "expected_stdout": "saved\n",
+        "hint": "Inside the read context, call your read-text token on cv_file and assign the result to cv_message.",
+        "explanation": "Opening with r provides a readable file object; read returns its stored text.",
+        "starter": lambda t: (
+            f'{t["py_kw_with"]} {t["py_fn_open"]}("cv_practice_note.txt", "w") {t["py_kw_as"]} cv_file:\n'
+            f'    cv_file.{t["py_file_write"]}("saved")\n'
+            f'{t["py_kw_with"]} {t["py_fn_open"]}("cv_practice_note.txt", "r") {t["py_kw_as"]} cv_file:\n'
+            '    cv_message = ""  # TODO: read from cv_file\n'
+            f'    {t["py_fn_print"]}(cv_message)\n'
+        ),
+        "solution": lambda t: (
+            f'{t["py_kw_with"]} {t["py_fn_open"]}("cv_practice_note.txt", "w") {t["py_kw_as"]} cv_file:\n'
+            f'    cv_file.{t["py_file_write"]}("saved")\n'
+            f'{t["py_kw_with"]} {t["py_fn_open"]}("cv_practice_note.txt", "r") {t["py_kw_as"]} cv_file:\n'
+            f'    cv_message = cv_file.{t["py_file_read"]}()\n'
+            f'    {t["py_fn_print"]}(cv_message)\n'
         ),
     },
     "errors": {
@@ -1048,6 +1439,15 @@ def _code_header(dictionary: Any) -> str:
 _TASK_ANSWERS: dict[str, tuple[str, ...]] = {
     "signals-output": ("Personal Python ready",),
     "signals-translate": ("print",),
+    "signals-number-expression": ("8", "eight"),
+    "signals-variable-update": ("9", "nine"),
+    "signals-multiple-values": ("score: 12",),
+    "strings-clean": ("whitespace at both ends",),
+    "strings-translate": ("upper",),
+    "numbers-int-truncation": ("3", "three"),
+    "numbers-absolute-value": ("8", "eight"),
+    "imports-module-access": ("cv_math.sqrt",),
+    "imports-from-purpose": ("mean",),
     "choices-branch": ("keep practicing",),
     "choices-order": ("if",),
     "routes-count": ("3", "three"),
@@ -1058,6 +1458,10 @@ _TASK_ANSWERS: dict[str, tuple[str, ...]] = {
     "logic-output": ("go empty", "go\nempty"),
     "collections-length": ("2", "two"),
     "collections-get": ("150",),
+    "tuples-fixed-record": ("tuple",),
+    "sets-unique-count": ("2", "two"),
+    "files-write-mode": ("w", "write", "write mode"),
+    "files-context-cleanup": ("the file is closed", "file is closed", "closed", "closes the file"),
     "objects-output": ("Ada", "ada"),
     "errors-cleanup": ("cleanup",),
 }
@@ -1065,6 +1469,15 @@ _TASK_ANSWERS: dict[str, tuple[str, ...]] = {
 _TASK_MODULES: dict[str, str] = {
     "signals-output": "signals-and-values",
     "signals-translate": "signals-and-values",
+    "signals-number-expression": "signals-and-values",
+    "signals-variable-update": "signals-and-values",
+    "signals-multiple-values": "signals-and-values",
+    "strings-clean": "strings-and-text",
+    "strings-translate": "strings-and-text",
+    "numbers-int-truncation": "numbers-and-conversion",
+    "numbers-absolute-value": "numbers-and-conversion",
+    "imports-module-access": "imports-and-library",
+    "imports-from-purpose": "imports-and-library",
     "choices-branch": "choices",
     "choices-order": "choices",
     "routes-count": "routes",
@@ -1075,6 +1488,10 @@ _TASK_MODULES: dict[str, str] = {
     "logic-output": "logic",
     "collections-length": "collections",
     "collections-get": "collections",
+    "tuples-fixed-record": "tuples-and-sets",
+    "sets-unique-count": "tuples-and-sets",
+    "files-write-mode": "files-and-context",
+    "files-context-cleanup": "files-and-context",
     "objects-output": "objects",
     "errors-cleanup": "errors",
 }
@@ -1085,6 +1502,185 @@ def _bridge_steps(concepts: tuple[LearningConcept, ...]) -> tuple[str, ...]:
     for concept in concepts:
         steps.append(f"Personal: {concept.personal_token} -> Python: {concept.python_concept}")
     return tuple(steps)
+
+
+def _lesson_sections(module_id: str, dictionary: Any) -> tuple[LessonSection, ...]:
+    if module_id == "strings-and-text":
+        output = _token(dictionary, "py_fn_print")
+        convert = _token(dictionary, "py_fn_str")
+        strip = _token(dictionary, "py_str_strip")
+        replace = _token(dictionary, "py_str_replace")
+        upper = _token(dictionary, "py_str_upper")
+        lower = _token(dictionary, "py_str_lower")
+        split = _token(dictionary, "py_str_split")
+        return (
+            LessonSection(
+                section_id="strings-values-and-conversion",
+                title="Build text values deliberately",
+                objective="Create strings and convert non-text values before combining them.",
+                explanation=(
+                    "Strings are ordered sequences of characters. Python will not silently join a number to text, "
+                    "so explicit conversion makes the intended representation clear."
+                ),
+                key_points=(
+                    "Quotes create string literals.",
+                    "str converts a value to its text representation.",
+                    "The plus operator joins strings only when both sides are text.",
+                ),
+                personal_example=f'cv_year = {convert}(2026)\n{output}("CodeVerse " + cv_year)',
+                real_python_example='cv_year = str(2026)\nprint("CodeVerse " + cv_year)',
+                expected_output="CodeVerse 2026\n",
+            ),
+            LessonSection(
+                section_id="strings-trim-boundaries",
+                title="Trim accidental boundary whitespace",
+                objective="Remove whitespace at the beginning and end without damaging spacing inside the text.",
+                explanation=(
+                    "User input and file lines often carry invisible spaces or newline characters. strip cleans the "
+                    "outer boundaries while preserving meaningful spaces between words."
+                ),
+                key_points=(
+                    "strip removes leading and trailing whitespace.",
+                    "Internal spaces remain unchanged.",
+                    "The method returns a new string.",
+                ),
+                personal_example=f'cv_name = "  Ada Lovelace  ".{strip}()\n{output}(cv_name)',
+                real_python_example='cv_name = "  Ada Lovelace  ".strip()\nprint(cv_name)',
+                expected_output="Ada Lovelace\n",
+            ),
+            LessonSection(
+                section_id="strings-replace-without-mutation",
+                title="Replace text without mutating the original",
+                objective="Create a revised string and preserve the source value for comparison.",
+                explanation=(
+                    "Strings are immutable: methods such as replace do not edit the existing object. They return a "
+                    "new value that must be assigned or used directly."
+                ),
+                key_points=(
+                    "replace returns a new string.",
+                    "The original variable keeps its previous value.",
+                    "Assign the returned string when the change should persist.",
+                ),
+                personal_example=(
+                    f'cv_original = "red,blue"\ncv_clean = cv_original.{replace}(",", "-")\n'
+                    f'{output}(cv_original)\n{output}(cv_clean)'
+                ),
+                real_python_example=(
+                    'cv_original = "red,blue"\ncv_clean = cv_original.replace(",", "-")\n'
+                    'print(cv_original)\nprint(cv_clean)'
+                ),
+                expected_output="red,blue\nred-blue\n",
+            ),
+            LessonSection(
+                section_id="strings-normalize-case",
+                title="Normalize letter case for comparison",
+                objective="Produce consistent uppercase and lowercase representations.",
+                explanation=(
+                    "Case normalization is useful when values come from people or external systems with inconsistent "
+                    "capitalization. The original text remains available."
+                ),
+                key_points=(
+                    "upper creates an uppercase string.",
+                    "lower creates a lowercase string.",
+                    "Normalization makes later comparisons predictable.",
+                ),
+                personal_example=f'cv_tag = "PyThOn"\n{output}(cv_tag.{upper}())\n{output}(cv_tag.{lower}())',
+                real_python_example='cv_tag = "PyThOn"\nprint(cv_tag.upper())\nprint(cv_tag.lower())',
+                expected_output="PYTHON\npython\n",
+            ),
+            LessonSection(
+                section_id="strings-split-structure",
+                title="Turn one string into structured pieces",
+                objective="Split text into a list that can later be counted, indexed, or looped over.",
+                explanation=(
+                    "split changes the shape of the data: the result is a list of strings, not another single string. "
+                    "Without an argument, consecutive whitespace acts as the separator."
+                ),
+                key_points=(
+                    "split returns a list of strings.",
+                    "Whitespace splitting ignores repeated boundary spacing.",
+                    "A separator argument can split formats such as comma-separated text.",
+                ),
+                personal_example=f'cv_words = "learn real python".{split}()\n{output}(cv_words)',
+                real_python_example='cv_words = "learn real python".split()\nprint(cv_words)',
+                expected_output="['learn', 'real', 'python']\n",
+            ),
+        )
+
+    if module_id != "signals-and-values":
+        return ()
+
+    output = _token(dictionary, "py_fn_print")
+    return (
+        LessonSection(
+            section_id="signals-visible-output",
+            title="Make program state visible",
+            objective="Use output as evidence of what the program actually did.",
+            explanation=(
+                "A program normally works invisibly. Python print turns a value into observable output, "
+                "which makes it the first debugging and learning tool to reach for."
+            ),
+            key_points=(
+                "Each call writes its arguments and then starts a new line.",
+                "Text literals need quotes; numeric literals do not.",
+                "The personal token changes the cue, not Python's output behavior.",
+            ),
+            personal_example=f'{output}("Personal Python ready")',
+            real_python_example='print("Personal Python ready")',
+            expected_output="Personal Python ready\n",
+        ),
+        LessonSection(
+            section_id="signals-values-and-types",
+            title="Distinguish text from numbers",
+            objective="Recognize that values which look alike can behave differently.",
+            explanation=(
+                "The text \"7\" and the integer 7 display similarly, but only the integer participates "
+                "in arithmetic. Quotes are therefore part of the program's meaning."
+            ),
+            key_points=(
+                "Quoted digits are strings.",
+                "Unquoted digits are numeric values.",
+                "Expressions are evaluated before their result is printed.",
+            ),
+            personal_example=f'{output}("7")\n{output}(7 + 1)',
+            real_python_example='print("7")\nprint(7 + 1)',
+            expected_output="7\n8\n",
+        ),
+        LessonSection(
+            section_id="signals-named-values",
+            title="Observe variables changing",
+            objective="Assign a value to a name and inspect the latest value stored there.",
+            explanation=(
+                "A variable is a name that refers to a value. Reassignment changes what that name refers "
+                "to, and output lets you verify the change in order."
+            ),
+            key_points=(
+                "Assignment uses one equals sign.",
+                "Reading a variable uses its name without quotes.",
+                "Statements run from top to bottom unless control flow changes the order.",
+            ),
+            personal_example=f'cv_score = 7\n{output}(cv_score)\ncv_score = 9\n{output}(cv_score)',
+            real_python_example='cv_score = 7\nprint(cv_score)\ncv_score = 9\nprint(cv_score)',
+            expected_output="7\n9\n",
+        ),
+        LessonSection(
+            section_id="signals-debug-labels",
+            title="Label debugging output",
+            objective="Print context beside a value so output remains understandable.",
+            explanation=(
+                "Bare numbers quickly become ambiguous. Passing a short label and a value to print creates "
+                "readable evidence without changing the value itself."
+            ),
+            key_points=(
+                "A print call can accept multiple comma-separated arguments.",
+                "Python inserts a space between those arguments by default.",
+                "Useful labels make later debugging faster.",
+            ),
+            personal_example=f'cv_score = 12\n{output}("score:", cv_score)',
+            real_python_example='cv_score = 12\nprint("score:", cv_score)',
+            expected_output="score: 12\n",
+        ),
+    )
 
 
 def _lesson_steps(module_id: str, concepts: tuple[LearningConcept, ...]) -> tuple[str, ...]:
@@ -1119,6 +1715,31 @@ def _misconception_checks(module_id: str) -> tuple[str, ...]:
             "list positions are ordered; dict values are found by key.",
             "append changes the list; it does not create a visible output by itself.",
         ),
+        "tuples-and-sets": (
+            "A tuple keeps order but cannot be changed in place; a set is mutable but does not promise display order.",
+            "Sets remove duplicate values, so their length can be smaller than the input sequence.",
+            "discard is safe when a value is absent; remove would raise KeyError.",
+        ),
+        "files-and-context": (
+            "open returns a file object; it does not read the file by itself.",
+            "Mode w replaces existing contents, while mode a appends to them.",
+            "with closes the file automatically, including when the block exits because of an error.",
+        ),
+        "strings-and-text": (
+            "String methods return new strings; they do not change the original value in place.",
+            "strip removes whitespace at the edges, not spaces between words.",
+            "split returns a list of strings, not one modified string.",
+        ),
+        "numbers-and-conversion": (
+            "int truncates a decimal value toward zero; it does not round to the nearest integer.",
+            "Converting numeric text changes its type; the original string itself is not modified.",
+            "round controls displayed precision but floating-point values can still have representation limits.",
+        ),
+        "imports-and-library": (
+            "importing a module does not run one of its tools automatically.",
+            "A module alias changes the local name, not the original package or its API.",
+            "from-import selects named members; it does not copy an entire library into the project.",
+        ),
         "errors": (
             "try is not for hiding errors; it is for handling risky code deliberately.",
             "finally runs even when no exception happens.",
@@ -1139,6 +1760,14 @@ def _misconception_checks(module_id: str) -> tuple[str, ...]:
 
 
 def _success_criteria(module_id: str) -> tuple[str, ...]:
+    if module_id == "signals-and-values":
+        return (
+            "Distinguish quoted text from numeric values.",
+            "Predict output in top-to-bottom execution order.",
+            "Use a variable and observe its latest assigned value.",
+            "Write and run labeled output with your personal print token.",
+            "Score at least 70% across knowledge and code checks.",
+        )
     return (
         "Explain each personal token as a real Python concept.",
         "Predict the lesson output before running it.",
@@ -1149,6 +1778,27 @@ def _success_criteria(module_id: str) -> tuple[str, ...]:
 def _real_python_preview(module_id: str) -> str:
     previews = {
         "signals-and-values": 'print("Personal Python ready")\ncv_score = 7\nprint(cv_score)\n',
+        "strings-and-text": (
+            'cv_message = "  codeverse, python  "\n'
+            'cv_clean = cv_message.strip().replace(",", "").upper()\n'
+            "print(cv_clean)\n"
+            "cv_words = cv_clean.lower().split()\n"
+            "print(cv_words)\n"
+            "print(str(2026))\n"
+        ),
+        "numbers-and-conversion": (
+            'cv_price = float("12.5")\n'
+            'cv_count = int("3")\n'
+            'print(round(cv_price * cv_count, 1))\n'
+            'print(abs(-8))\n'
+            'print(pow(2, 3))\n'
+        ),
+        "imports-and-library": (
+            'import math as cv_math\n'
+            'print(cv_math.sqrt(81))\n'
+            'from statistics import mean as cv_mean\n'
+            'print(cv_mean([2, 4, 6]))\n'
+        ),
         "choices": (
             "cv_score = 75\n"
             "if cv_score >= 80:\n"
@@ -1187,6 +1837,24 @@ def _real_python_preview(module_id: str) -> str:
             'print(cv_profile.get("best"))\n'
             "print(len(cv_scores))\n"
         ),
+        "tuples-and-sets": (
+            'cv_route = tuple(["dock", "market"])\n'
+            'cv_tags = set(["red", "blue", "red"])\n'
+            'cv_tags.add("green")\n'
+            'cv_tags.discard("blue")\n'
+            'cv_backup = set(["yellow"])\n'
+            'cv_all = cv_tags.union(cv_backup)\n'
+            'print(cv_route)\n'
+            'print(len(cv_all))\n'
+            'print("red" in cv_all)\n'
+        ),
+        "files-and-context": (
+            'with open("cv_lesson_note.txt", "w") as cv_file:\n'
+            '    cv_file.write("Python files stay safe")\n'
+            'with open("cv_lesson_note.txt", "r") as cv_file:\n'
+            '    cv_note = cv_file.read()\n'
+            '    print(cv_note)\n'
+        ),
         "objects": (
             "class CvLearner:\n"
             '    def __init__(self, name="student", points=0):\n'
@@ -1215,12 +1883,17 @@ def _real_python_preview(module_id: str) -> str:
 def _expected_stdout(module_id: str) -> str:
     outputs = {
         "signals-and-values": "Personal Python ready\n7\n",
+        "strings-and-text": "CODEVERSE PYTHON\n['codeverse', 'python']\n2026\n",
+        "numbers-and-conversion": "37.5\n8\n8\n",
+        "imports-and-library": "9.0\n4\n",
         "choices": "keep practicing\n",
         "routes": "1\n2\n3\n",
         "loop-control": "1\n3\n",
         "tools": "150\n",
         "logic": "go\nempty\n",
         "collections": "[100, 150]\n150\n2\n",
+        "tuples-and-sets": "('dock', 'market')\n3\nTrue\n",
+        "files-and-context": "Python files stay safe\n",
         "objects": "Ada\n15\n",
         "errors": "attempt\ncleanup\n",
     }
@@ -1234,8 +1907,13 @@ def _prioritized_blueprints(diagnosis: LearnerDiagnosis) -> tuple[dict[str, Any]
         "routes": 0 if "loops" in pain else 3,
         "tools": 0 if "functions" in pain else 4,
         "collections": 1 if "collections" in pain else 5,
+        "tuples-and-sets": 2 if "collections" in pain else 6,
+        "files-and-context": 2 if "files" in pain else 7,
         "errors": 2 if "errors" in pain else 6,
         "signals-and-values": -1,
+        "strings-and-text": 1,
+        "numbers-and-conversion": 1 if "numbers" in pain else 2,
+        "imports-and-library": 2 if "imports" in pain else 7,
     }
     return tuple(sorted(_MODULE_BLUEPRINTS, key=lambda item: (weight.get(str(item["module_id"]), 9), str(item["module_id"]))))
 
@@ -1285,6 +1963,12 @@ def _recommended_start(pain_points: tuple[str, ...], level: str) -> str:
         return "routes"
     if "functions" in pain_points:
         return "tools"
+    if "numbers" in pain_points:
+        return "numbers-and-conversion"
+    if "imports" in pain_points:
+        return "imports-and-library"
+    if "files" in pain_points:
+        return "files-and-context"
     if level == "advanced":
         return "collections"
     return "signals-and-values"

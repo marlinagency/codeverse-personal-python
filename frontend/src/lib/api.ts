@@ -12,9 +12,10 @@ import type {
   ProgressProof,
   TargetLanguage,
   ThemeDictionary,
+  ThemeDictionaryCatalog,
 } from './types'
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 export class ApiError extends Error {
   status: number
@@ -165,6 +166,13 @@ export function gradePractice(
 
 export function getBridgeChallenge(token: string, themeId: string): Promise<BridgeChallenge> {
   return request(`/learning/${themeId}/bridge`, { token })
+}
+
+export function getThemeDictionaryCatalog(
+  token: string,
+  themeId: string,
+): Promise<ThemeDictionaryCatalog> {
+  return request(`/themes/${themeId}/dictionary`, { token })
 }
 
 export function checkBridge(

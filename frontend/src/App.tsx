@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { EditorPage } from './pages/EditorPage';
 import { AlertCircle } from 'lucide-react';
+import { BASE_URL } from './lib/api';
 
 interface User {
   id: string;
@@ -17,7 +18,7 @@ function App() {
   useEffect(() => {
     const fetchDevToken = async () => {
       try {
-        const response = await fetch('http://localhost:8000/auth/token', {
+        const response = await fetch(`${BASE_URL}/auth/token`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

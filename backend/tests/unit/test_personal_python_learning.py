@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import tempfile
 
 from codeverse_core.cvl.pipeline import CompilationPipeline
 from codeverse_core.personal_python.learning import (
@@ -68,26 +69,50 @@ def test_learning_path_prioritizes_detected_pain_points_and_uses_personal_tokens
     assert "Personal:" in route_module.bridge_steps[0]
 
 
+def test_signals_module_has_progressive_chapters_and_deeper_practice():
+    dictionary = _dictionary("I am new to Python and want visible examples")
+    module = build_learning_module(dictionary, "signals-and-values")
+
+    assert len(module.lesson_sections) == 4
+    assert [section.section_id for section in module.lesson_sections] == [
+        "signals-visible-output",
+        "signals-values-and-types",
+        "signals-named-values",
+        "signals-debug-labels",
+    ]
+    assert all(section.personal_example for section in module.lesson_sections)
+    assert all(section.real_python_example for section in module.lesson_sections)
+    assert all(section.expected_output for section in module.lesson_sections)
+    assert len(module.practice_tasks) == 6
+    assert len(module.success_criteria) == 5
+
+
 def test_learning_modules_compile_and_run_for_core_path():
     dictionary = _dictionary("gta san andreas oyununu seviyorum loops functions")
     pipeline = CompilationPipeline()
 
     for module_id, expected_stdout in {
         "signals-and-values": "Personal Python ready\n7\n",
+        "strings-and-text": "CODEVERSE PYTHON\n['codeverse', 'python']\n2026\n",
+        "numbers-and-conversion": "37.5\n8\n8\n",
+        "imports-and-library": "9.0\n4\n",
         "choices": "keep practicing\n",
         "routes": "1\n2\n3\n",
         "loop-control": "1\n3\n",
         "tools": "150\n",
         "logic": "go\nempty\n",
         "collections": "[100, 150]\n150\n2\n",
+        "tuples-and-sets": "('dock', 'market')\n3\nTrue\n",
+        "files-and-context": "Python files stay safe\n",
         "objects": "Ada\n15\n",
         "errors": "attempt\ncleanup\n",
     }.items():
         module = build_learning_module(dictionary, module_id)
         compiled = pipeline.compile(module.source_content, dictionary)
         stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            exec(compiled.codegen.source_code, {})  # noqa: S102 - generated test code.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with contextlib.chdir(temp_dir), contextlib.redirect_stdout(stdout):
+                exec(compiled.codegen.source_code, {})  # noqa: S102 - generated test code.
         assert stdout.getvalue() == expected_stdout
         assert module.expected_stdout == expected_stdout
         assert module.real_python_preview
@@ -100,8 +125,9 @@ def test_learning_modules_compile_and_run_for_core_path():
 def _run_compiled(pipeline: CompilationPipeline, source: str, dictionary) -> str:
     compiled = pipeline.compile(source, dictionary)
     stdout = io.StringIO()
-    with contextlib.redirect_stdout(stdout):
-        exec(compiled.codegen.source_code, {})  # noqa: S102 - generated test code.
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with contextlib.chdir(temp_dir), contextlib.redirect_stdout(stdout):
+            exec(compiled.codegen.source_code, {})  # noqa: S102 - generated test code.
     return stdout.getvalue()
 
 
@@ -113,7 +139,9 @@ def test_code_tasks_are_solvable_and_starters_do_not_pass():
     pipeline = CompilationPipeline()
     module_ids = (
         "signals-and-values", "choices", "routes", "loop-control",
-        "tools", "logic", "collections", "errors", "objects",
+        "strings-and-text", "numbers-and-conversion", "imports-and-library",
+        "tools", "logic", "collections", "tuples-and-sets",
+        "files-and-context", "errors", "objects",
     )
     for prompt in (
         "I love Counter-Strike 2 and loops/functions confuse me",

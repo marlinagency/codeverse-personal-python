@@ -117,6 +117,17 @@ export interface PracticeTask {
   explanation: string
 }
 
+export interface LessonSection {
+  section_id: string
+  title: string
+  objective: string
+  explanation: string
+  key_points: string[]
+  personal_example: string
+  real_python_example: string
+  expected_output: string
+}
+
 export interface LearningModule {
   module_id: string
   title: string
@@ -125,6 +136,7 @@ export interface LearningModule {
   concepts: LearningConcept[]
   bridge_steps: string[]
   lesson_steps: string[]
+  lesson_sections: LessonSection[]
   misconception_checks: string[]
   success_criteria: string[]
   source_content: string
@@ -218,4 +230,25 @@ export interface BridgeCheckResult {
   expected_stdout: string
   used_personal_tokens: string[]
   feedback: string
+}
+
+export interface ThemeDictionaryEntry {
+  concept_id: string
+  personal_token: string
+  python_name: string
+  real_syntax: string
+  category: string
+  tier: 'core' | 'builtin' | 'method' | 'type' | 'exception' | 'library' | string
+  description: string
+  rationale: string | null
+  sandbox_safe: boolean
+}
+
+export interface ThemeDictionaryCatalog {
+  theme_dictionary_id: string
+  theme_name: string
+  total: number
+  category_counts: Record<string, number>
+  tier_counts: Record<string, number>
+  entries: ThemeDictionaryEntry[]
 }

@@ -7,10 +7,13 @@ distilasyon demosu:
   yüzlerce doğrulanmış tema-profili + netleştirme-sorusu örneği üretir.
 Veri havuzu İngilizce-only'dir (ürün kararı: uygulama tamamen İngilizce).
 
-- **Öğrenci** (Qwen2.5-3B-Instruct): AMD AI Notebook'ta (ROCm + PyTorch)
-  LoRA ile fine-tune edilir, **vLLM** ile OpenAI-uyumlu API olarak servis
-  edilir ve CodeVerse uygulaması **tek satır config değişikliğiyle** ona
-  bağlanır.
+- **Öğrenci** (varsayılan: **Gemma 4 31B** — spec'in hedef üretim modeli;
+  Fireworks serverless veremiyordu, AMD'de kendimiz ayağa kaldırıyoruz):
+  AMD AI Notebook'ta (ROCm + PyTorch) LoRA ile fine-tune edilir, **vLLM**
+  ile OpenAI-uyumlu API olarak servis edilir ve CodeVerse uygulaması
+  **tek satır config değişikliğiyle** ona bağlanır. Not: Gemma HF'te
+  "gated" — lisansı kabul edip ücretsiz read token gerekir; kapısız hızlı
+  alternatif olarak Qwen2.5-3B-Instruct notebook'ta seçilebilir durumda.
 
 Demo cümlesi: *"Tema motorumuz artık AMD Instinct üzerinde, ROCm ile kendi
 eğittiğimiz modelle çalışıyor — provider mimarimiz sayesinde tek satırla."*

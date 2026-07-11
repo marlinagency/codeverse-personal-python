@@ -89,6 +89,7 @@ def test_python_taxonomy_resolves_remaining_keyword_surface():
     )
 
     generated = _compile_python(
+        "ice_al math gibi deniz_math\n"
         "dipten asyncio ice_al sleep gibi nap\n"
         "basinc_kabini kapak_ac(\"x.txt\") gibi f:\n"
         "    data = f.read()\n"
@@ -104,6 +105,7 @@ def test_python_taxonomy_resolves_remaining_keyword_surface():
         dictionary,  # type: ignore[arg-type]
     )
 
+    assert "import math as deniz_math" in generated
     assert "from asyncio import sleep as nap" in generated
     assert 'with open("x.txt") as f:' in generated
     assert "match \"\":" in generated

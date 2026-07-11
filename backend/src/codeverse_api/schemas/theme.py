@@ -55,3 +55,24 @@ class PersonalPythonLessonOut(BaseModel):
     target_language: str = "python"
     used_concepts: dict[str, str]
     focus: list[str]
+
+
+class ThemeDictionaryEntryOut(BaseModel):
+    concept_id: str
+    personal_token: str
+    python_name: str
+    real_syntax: str
+    category: str
+    tier: str
+    description: str
+    rationale: str | None = None
+    sandbox_safe: bool
+
+
+class ThemeDictionaryCatalogOut(BaseModel):
+    theme_dictionary_id: uuid.UUID
+    theme_name: str
+    total: int
+    category_counts: dict[str, int]
+    tier_counts: dict[str, int]
+    entries: list[ThemeDictionaryEntryOut]

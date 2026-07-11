@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, ArrowUp, Plus, Palette, AlertTriangle, X } from 'lucide-react';
+import { BASE_URL } from '../lib/api';
 
 interface ThemeMapping {
   id: string;
@@ -57,6 +58,43 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [progressPct, setProgressPct] = useState(0);
+  const [loadingQuestionsSuccess, setLoadingQuestionsSuccess] = useState(false);
+  const [generationSuccess, setGenerationSuccess] = useState(false);
+
+  useEffect(() => {
+    let intervalId: any = null;
+
+    if (generationSuccess || loadingQuestionsSuccess) {
+      setProgressPct(100);
+    } else if (stage === 'loading-questions') {
+      setProgressPct(10);
+      intervalId = setInterval(() => {
+        setProgressPct((prev) => {
+          if (prev < 90) {
+            return prev + 2;
+          }
+          return prev;
+        });
+      }, 100);
+    } else if (isGenerating) {
+      setProgressPct((prev) => Math.max(prev, 10));
+      intervalId = setInterval(() => {
+        setProgressPct((prev) => {
+          if (prev < 95) {
+            return prev + 1;
+          }
+          return prev;
+        });
+      }, 150);
+    } else {
+      setProgressPct(0);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [stage, isGenerating, loadingQuestionsSuccess, generationSuccess]);
 
   const resetWizardState = () => {
     setStage('idle');
@@ -72,7 +110,7 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
     setValidationProblems([]);
 
     try {
-      const response = await fetch('http://localhost:8000/themes/generate', {
+      const response = await fetch(`${BASE_URL}/themes/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,11 +135,19 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
         return;
       }
 
-      await onRefreshThemes();
-      onSelectTheme(data);
-      setIsModalOpen(false);
-      setNewThemePrompt('');
-      resetWizardState();
+      setGenerationSuccess(true);
+      setProgressPct(100);
+      setTimeout(async () => {
+        try {
+          await onRefreshThemes();
+          onSelectTheme(data);
+          setIsModalOpen(false);
+          setNewThemePrompt('');
+          resetWizardState();
+        } finally {
+          setGenerationSuccess(false);
+        }
+      }, 800);
     } catch (err: any) {
       setErrorMsg(err.message || 'Server connection error.');
     } finally {
@@ -121,7 +167,7 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
     const timeoutId = setTimeout(() => controller.abort(), QUESTIONS_TIMEOUT_MS);
 
     try {
-      const response = await fetch('http://localhost:8000/themes/questions', {
+      const response = await fetch(`${BASE_URL}/themes/questions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -138,11 +184,16 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
         throw new Error('no clarifying questions returned');
       }
 
-      setQuestions(data.questions);
-      setQuestionIndex(0);
-      setAnswers({});
-      setSelectedOption(null);
-      setStage('wizard');
+      setLoadingQuestionsSuccess(true);
+      setProgressPct(100);
+      setTimeout(() => {
+        setQuestions(data.questions);
+        setQuestionIndex(0);
+        setAnswers({});
+        setSelectedOption(null);
+        setStage('wizard');
+        setLoadingQuestionsSuccess(false);
+      }, 800);
     } catch {
       clearTimeout(timeoutId);
       // Graceful degradation: the user must never be blocked by this step —
@@ -186,74 +237,140 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
   };
 
   const renderWizard = () => {
-    if (stage === 'idle') return null;
+    if (stage === 'idle' && !isGenerating && !generationSuccess && !loadingQuestionsSuccess) return null;
 
     const isLoadingQuestions = stage === 'loading-questions';
+
+    if (isLoadingQuestions || isGenerating || loadingQuestionsSuccess || generationSuccess) {
+      let step1Status: 'complete' | 'active' | 'upcoming' = 'complete';
+      let step2Status: 'complete' | 'active' | 'upcoming' = 'upcoming';
+      let step3Status: 'complete' | 'active' | 'upcoming' = 'upcoming';
+
+      if (generationSuccess) {
+        step2Status = 'complete';
+        step3Status = 'complete';
+      } else if (loadingQuestionsSuccess) {
+        step2Status = 'complete';
+      } else if (isLoadingQuestions) {
+        step2Status = 'active';
+      } else if (isGenerating) {
+        step2Status = 'complete';
+        step3Status = 'active';
+      }
+
+      const renderStepIcon = (status: 'complete' | 'active' | 'upcoming') => {
+        if (status === 'complete') {
+          return (
+            <div className="cv-icon-check-wrapper">
+              <svg className="cv-icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+          );
+        }
+        if (status === 'active') {
+          return <div className="cv-icon-active" />;
+        }
+        return <div className="cv-icon-upcoming" />;
+      };
+
+      return createPortal(
+        <div className="modal-overlay">
+          <div className="cv-loading-modal">
+            <span className="cv-loading-title">BUILDING YOUR CODEVERSE</span>
+            
+            <div className="cv-loading-illustration">
+              <div className="juggling-dino-loading" />
+            </div>
+
+            <p className="cv-loading-subtitle">
+              We're turning your world into a personalized Python learning experience.
+            </p>
+
+            <div className="cv-loading-steps">
+              <div className={`cv-loading-step ${step1Status}`}>
+                <span className="cv-step-icon">{renderStepIcon(step1Status)}</span>
+                <span className="cv-step-text">Understanding your theme</span>
+              </div>
+              <div className={`cv-loading-step ${step2Status}`}>
+                <span className="cv-step-icon">{renderStepIcon(step2Status)}</span>
+                <span className="cv-step-text">
+                  {step2Status === 'active' ? 'Designing your questions...' : 'Designing your questions'}
+                </span>
+              </div>
+              <div className={`cv-loading-step ${step3Status}`}>
+                <span className="cv-step-icon">{renderStepIcon(step3Status)}</span>
+                <span className="cv-step-text">
+                  {step3Status === 'active' ? 'Preparing your syntax map...' : 'Preparing your syntax map'}
+                </span>
+              </div>
+            </div>
+
+            <div className="cv-loading-progress-track">
+              <div className="cv-loading-progress-fill" style={{ width: `${progressPct}%` }} />
+            </div>
+
+            <span className="cv-loading-footer">Usually takes less than 20 seconds</span>
+          </div>
+        </div>,
+        document.body
+      );
+    }
+
     const current = questions[questionIndex];
-    const progressPct = isLoadingQuestions
-      ? 0
-      : ((questionIndex + (selectedOption ? 1 : 0.5)) / questions.length) * 100;
+    const wizardProgressPct = ((questionIndex + (selectedOption ? 1 : 0.5)) / questions.length) * 100;
 
     return createPortal(
       <div className="modal-overlay">
         <div className="wizard-content glass-panel">
           <div className="wizard-progress-track">
-            <div className="wizard-progress-fill" style={{ width: `${progressPct}%` }} />
+            <div className="wizard-progress-fill" style={{ width: `${wizardProgressPct}%` }} />
           </div>
 
-          {isLoadingQuestions ? (
-            <div className="wizard-loading">
-              <div className="spinner" />
-              <span>Designing questions about your world...</span>
-            </div>
-          ) : (
-            <>
-              <div className="wizard-header">
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  disabled={questionIndex === 0}
-                  className="wizard-back-btn"
-                  title="Previous question"
-                >
-                  <ArrowLeft size={18} />
-                </button>
-                <span className="wizard-step-label">
-                  Question {questionIndex + 1} of {questions.length}
-                </span>
-              </div>
+          <div className="wizard-header">
+            <button
+              type="button"
+              onClick={handleBack}
+              disabled={questionIndex === 0}
+              className="wizard-back-btn"
+              title="Previous question"
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <span className="wizard-step-label">
+              Question {questionIndex + 1} of {questions.length}
+            </span>
+          </div>
 
-              <p className="wizard-question">{current.question}</p>
+          <p className="wizard-question">{current.question}</p>
 
-              <div className="wizard-options-grid">
-                {current.options.map((opt) => (
-                  <button
-                    type="button"
-                    key={opt.label}
-                    className={`wizard-option-card${selectedOption === opt.label ? ' selected' : ''}`}
-                    onClick={() => setSelectedOption(opt.label)}
-                  >
-                    <span className="wizard-option-icon">{opt.icon}</span>
-                    <span className="wizard-option-label">{opt.label}</span>
-                  </button>
-                ))}
-              </div>
+          <div className="wizard-options-grid">
+            {current.options.map((opt) => (
+              <button
+                type="button"
+                key={opt.label}
+                className={`wizard-option-card${selectedOption === opt.label ? ' selected' : ''}`}
+                onClick={() => setSelectedOption(opt.label)}
+              >
+                <span className="wizard-option-icon">{opt.icon}</span>
+                <span className="wizard-option-label">{opt.label}</span>
+              </button>
+            ))}
+          </div>
 
-              <div className="wizard-footer">
-                <button type="button" onClick={handleSkipQuestion} className="wizard-skip-link">
-                  Skip this question
-                </button>
-                <button
-                  type="button"
-                  onClick={handleContinue}
-                  disabled={!selectedOption}
-                  className="btn-primary"
-                >
-                  {questionIndex + 1 === questions.length ? 'Finish' : 'Continue'}
-                </button>
-              </div>
-            </>
-          )}
+          <div className="wizard-footer">
+            <button type="button" onClick={handleSkipQuestion} className="wizard-skip-link">
+              Skip this question
+            </button>
+            <button
+              type="button"
+              onClick={handleContinue}
+              disabled={!selectedOption}
+              className="btn-primary"
+            >
+              {questionIndex + 1 === questions.length ? 'Finish' : 'Continue'}
+            </button>
+          </div>
         </div>
       </div>,
       document.body

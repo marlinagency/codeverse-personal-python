@@ -53,9 +53,10 @@ free text ─▶ Clarifying wizard ─▶ Theme profile (LLM = the brain)
 
 See [`amd/README.md`](amd/README.md): a teacher→student distillation pipeline —
 the Fireworks teacher generates a validated training set from the app's real
-prompts, a Qwen2.5-3B student is LoRA fine-tuned **on AMD Instinct GPUs with
-ROCm** (AMD AI Notebooks), served with **vLLM** as an OpenAI-compatible
-endpoint, and plugged into the app with a one-line provider switch. The public
+prompts, and the product spec's intended production model (**Gemma 4**) is
+LoRA fine-tuned **on AMD Instinct GPUs with ROCm** (AMD AI Notebooks), served
+with **vLLM** as an OpenAI-compatible endpoint, and plugged into the app with
+a one-line provider switch. The public
 demo itself is hosted on **AMD Developer Cloud** ([`DEPLOY.md`](DEPLOY.md)).
 
 ## Run it locally

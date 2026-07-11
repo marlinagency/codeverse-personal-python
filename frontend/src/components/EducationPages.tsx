@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -9,8 +9,10 @@ import {
   Circle,
   GraduationCap,
   Lightbulb,
+  Library,
   LockKeyhole,
   Play,
+  Search,
   Sparkles,
   Target,
   Trophy,
@@ -25,6 +27,7 @@ import {
   getLearningPath,
   getLearningProgress,
   getProgressProof,
+  getThemeDictionaryCatalog,
   gradePractice,
   runPracticeCode,
 } from '../lib/api';
@@ -39,9 +42,10 @@ import type {
   PracticeEvaluation,
   PracticeRunResult,
   ProgressProof,
+  ThemeDictionaryCatalog,
 } from '../lib/types';
 
-export type EducationView = 'learn' | 'lesson' | 'challenge' | 'graduation' | 'playground';
+export type EducationView = 'learn' | 'lesson' | 'challenge' | 'graduation' | 'dictionary' | 'playground';
 
 interface EducationTheme {
   id: string;
@@ -96,12 +100,13 @@ export function AnimatedLandingDemo() {
   );
 }
 
-function ProductHeader({ onNavigate, active = 'learn' }: { onNavigate: (view: EducationView) => void; active?: 'learn' | 'playground' }) {
+function ProductHeader({ onNavigate, active = 'learn' }: { onNavigate: (view: EducationView) => void; active?: 'learn' | 'dictionary' | 'playground' }) {
   return (
     <header className="edu-header">
       <button className="edu-wordmark" onClick={() => onNavigate('learn')}>CODEVERSE</button>
       <nav aria-label="Primary navigation">
         <button className={active === 'learn' ? 'active' : ''} onClick={() => onNavigate('learn')}>Learn</button>
+        <button className={active === 'dictionary' ? 'active' : ''} onClick={() => onNavigate('dictionary')}>Dictionary</button>
         <button className={active === 'playground' ? 'active' : ''} onClick={() => onNavigate('playground')}>Playground</button>
       </nav>
       <button className="edu-avatar" title="Profile">A</button>
@@ -214,7 +219,7 @@ function LearnDashboard({ path, progress, proof, onOpenLesson, onNavigate }: Lea
                 );
               })}
               <button className={`edu-module-card graduation-card ${graduation?.passed ? 'complete' : 'active'}`} onClick={() => onNavigate('graduation')}>
-                <div className="edu-module-top"><span className="edu-module-state">{graduation?.passed ? <Check /> : <GraduationCap />}</span><strong>10</strong><h2>Graduation Bridge</h2><span className="edu-state-label">{graduation?.passed ? 'Graduated' : 'Capstone'}</span></div>
+                <div className="edu-module-top"><span className="edu-module-state">{graduation?.passed ? <Check /> : <GraduationCap />}</span><strong>{String(path.modules.length + 1).padStart(2, '0')}</strong><h2>Graduation Bridge</h2><span className="edu-state-label">{graduation?.passed ? 'Graduated' : 'Capstone'}</span></div>
                 <p>Remove the personal scaffold and prove you can write standard Python.</p>
                 <div className="edu-module-progress"><i style={{ width: graduation?.passed ? '100%' : '0%' }} /><span>{graduation?.passed ? 100 : 0}%</span></div>
               </button>
@@ -227,6 +232,10 @@ function LearnDashboard({ path, progress, proof, onOpenLesson, onNavigate }: Lea
             <section className="edu-side-card">
               <h3><BookOpen /> Current concepts</h3>
               {(previewModule?.concepts || []).slice(0, 4).map((concept) => <div className="edu-map-row" key={concept.concept_id}><code>{concept.personal_token}</code><span>-&gt;</span><code>{concept.python_concept}</code></div>)}
+            </section>
+            <section className="edu-side-card edu-next-card">
+              <h3><Library /> Full Python Dictionary</h3><p>Explore every generated Python token and its canonical counterpart.</p>
+              <button onClick={() => onNavigate('dictionary')}>Open dictionary <ArrowRight /></button>
             </section>
             <section className="edu-side-card edu-next-card">
               <h3><Zap /> Next lesson</h3><p>{nextModule?.goal}</p>
@@ -293,13 +302,23 @@ function LessonPage({ path, lesson, progress, onSelectModule, onStartPractice, o
               {(['concept', 'example', 'try'] as const).map((name) => <button className={tab === name ? 'active' : ''} onClick={() => setTab(name)} key={name}>{name === 'try' ? 'Practice' : name[0].toUpperCase() + name.slice(1)}</button>)}
             </div>
             {tab === 'concept' && <div className="edu-condition-example"><DashboardCodePair module={lesson} /><p><Sparkles /> The backend compiled this personal syntax into real Python and verified its output.</p></div>}
-            {tab === 'example' && <div className="edu-lesson-copy"><h3>Build the mental model</h3>{lesson.lesson_steps.map((step, index) => <div key={step}><span>{index + 1}</span><p>{step}</p></div>)}<h3>Common misconceptions</h3>{lesson.misconception_checks.map((item) => <p className="misconception" key={item}><X />{item}</p>)}</div>}
+            {tab === 'example' && <div className="edu-lesson-copy">
+              <h3>{lesson.lesson_sections.length ? `${lesson.lesson_sections.length} lesson chapters` : 'Build the mental model'}</h3>
+              {lesson.lesson_sections.length ? <div className="edu-section-list">{lesson.lesson_sections.map((section, index) => <article className="edu-lesson-section" key={section.section_id}>
+                <header><span>{index + 1}</span><div><small>{section.objective}</small><h4>{section.title}</h4></div></header>
+                <p>{section.explanation}</p>
+                <ul>{section.key_points.map((point) => <li key={point}>{point}</li>)}</ul>
+                <div className="edu-section-code"><div><small>Personal Python</small><pre>{section.personal_example}</pre></div><div><small>Real Python</small><pre>{section.real_python_example}</pre></div></div>
+                <div className="edu-section-output"><small>Expected output</small><pre>{section.expected_output}</pre></div>
+              </article>)}</div> : lesson.lesson_steps.map((step, index) => <div key={step}><span>{index + 1}</span><p>{step}</p></div>)}
+              <h3>Common misconceptions</h3>{lesson.misconception_checks.map((item) => <p className="misconception" key={item}><X />{item}</p>)}
+            </div>}
             {tab === 'try' && <div className="edu-practice-preview"><h3>{lesson.practice_tasks.length} backend-checked exercises</h3>{lesson.practice_tasks.map((task) => <div key={task.id}><span>{task.kind.replace('_', ' ')}</span><p>{task.prompt}</p></div>)}<button onClick={onStartPractice}><Play /> Start practice</button></div>}
           </section>
 
           <aside className="edu-lesson-right">
             <section className="edu-side-card"><h3><Lightbulb /> Hints</h3><p>{lesson.why_it_matters}</p><button onClick={() => setHintOpen((open) => !open)}>Show hint <ChevronDown /></button>{hintOpen && <p className="edu-hint">{lesson.bridge_steps[0]}</p>}</section>
-            <section className="edu-side-card"><h3><BookOpen /> Vocabulary</h3>{lesson.concepts.slice(0, 5).map((concept) => <div className="edu-map-row" key={concept.concept_id}><code>{concept.personal_token}</code><span>-&gt;</span><code>{concept.python_concept}</code></div>)}</section>
+            <section className="edu-side-card"><h3><BookOpen /> Vocabulary</h3>{lesson.concepts.map((concept) => <div className="edu-map-row" key={concept.concept_id}><code>{concept.personal_token}</code><span>-&gt;</span><code>{concept.python_concept}</code></div>)}</section>
             <section className="edu-side-card edu-next-card"><h3><Zap /> Practice</h3><p>Run a real Personal Python exercise and receive backend feedback.</p><button onClick={onStartPractice}>Start exercises <ArrowRight /></button></section>
           </aside>
         </div>
@@ -401,6 +420,105 @@ function ChallengePage({ lesson, theme, token, onProgressChanged, onNavigate }: 
             {mastery && <section className={`edu-result-card ${mastery.passed ? 'pass' : 'fail'}`}><strong>{mastery.overall_score}% mastery</strong><p>{mastery.modules[0]?.feedback}</p></section>}
           </aside>
         </div>
+      </main>
+      <PageFooter />
+    </div>
+  );
+}
+
+const DICTIONARY_BATCH_SIZE = 96;
+
+function prettyCategory(value: string) {
+  return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function DictionaryPage({ theme, token, onNavigate }: { theme: EducationTheme; token: string; onNavigate: (view: EducationView) => void }) {
+  const [catalog, setCatalog] = useState<ThemeDictionaryCatalog | null>(null);
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('all');
+  const [tier, setTier] = useState('all');
+  const [visibleLimit, setVisibleLimit] = useState(DICTIONARY_BATCH_SIZE);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    getThemeDictionaryCatalog(token, theme.id)
+      .then((data) => { if (!cancelled) setCatalog(data); })
+      .catch((reason: Error) => { if (!cancelled) setError(reason.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [theme.id, token]);
+
+  useEffect(() => { setVisibleLimit(DICTIONARY_BATCH_SIZE); }, [query, category, tier]);
+
+  const filteredEntries = useMemo(() => {
+    if (!catalog) return [];
+    const folded = query.trim().toLowerCase();
+    return catalog.entries.filter((entry) => {
+      if (category !== 'all' && entry.category !== category) return false;
+      if (tier !== 'all' && entry.tier !== tier) return false;
+      if (!folded) return true;
+      return [entry.personal_token, entry.python_name, entry.real_syntax, entry.concept_id, entry.description]
+        .some((value) => value.toLowerCase().includes(folded));
+    });
+  }, [catalog, category, query, tier]);
+
+  const visibleEntries = filteredEntries.slice(0, visibleLimit);
+  const categories = catalog ? Object.entries(catalog.category_counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])) : [];
+  const safeCount = catalog?.entries.filter((entry) => entry.sandbox_safe).length || 0;
+
+  return (
+    <div className="edu-page">
+      <ProductHeader onNavigate={onNavigate} active="dictionary" />
+      <main className="edu-main edu-dictionary">
+        <div className="edu-breadcrumb"><button onClick={() => onNavigate('learn')}>Learn</button><span>/</span><strong>Full Python Dictionary</strong></div>
+        <section className="edu-dictionary-heading">
+          <div><span><Library /></span><h1>{theme.theme_name} Python Dictionary</h1><p>Every generated personal token, connected back to canonical Python.</p></div>
+          <Dino />
+        </section>
+
+        {loading ? <div className="edu-inline-loading"><div className="spinner" /> Loading the complete Python dictionary...</div> : error ? <div className="edu-inline-error">{error}</div> : catalog && <>
+          <section className="edu-dictionary-stats">
+            <div><small>Total mappings</small><strong>{catalog.total}</strong><span>Python only</span></div>
+            <div><small>Categories</small><strong>{Object.keys(catalog.category_counts).length}</strong><span>Grouped for learning</span></div>
+            <div><small>Sandbox safe</small><strong>{safeCount}</strong><span>Runnable without external libraries</span></div>
+            <div><small>Theme</small><strong>{catalog.theme_name}</strong><span>Personal syntax layer</span></div>
+          </section>
+
+          <section className="edu-dictionary-toolbar" aria-label="Dictionary filters">
+            <label><Search /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search a personal token or Python concept" /></label>
+            <select aria-label="Filter by category" value={category} onChange={(event) => setCategory(event.target.value)}>
+              <option value="all">All categories ({catalog.total})</option>
+              {categories.map(([name, count]) => <option key={name} value={name}>{prettyCategory(name)} ({count})</option>)}
+            </select>
+            <select aria-label="Filter by tier" value={tier} onChange={(event) => setTier(event.target.value)}>
+              <option value="all">All tiers</option>
+              {Object.entries(catalog.tier_counts).map(([name, count]) => <option key={name} value={name}>{prettyCategory(name)} ({count})</option>)}
+            </select>
+          </section>
+
+          <div className="edu-dictionary-summary"><span>Showing {Math.min(visibleEntries.length, filteredEntries.length)} of {filteredEntries.length}</span><span>Personal token <strong>-&gt;</strong> real Python</span></div>
+
+          {visibleEntries.length ? <section className="edu-dictionary-grid">
+            {visibleEntries.map((entry) => <article className="edu-dictionary-entry" key={entry.concept_id}>
+              <div className="edu-dictionary-map">
+                <div><small>Your token</small><code>{entry.personal_token}</code></div>
+                <span>-&gt;</span>
+                <div><small>Real Python</small><strong>{entry.python_name}</strong></div>
+              </div>
+              <div className="edu-dictionary-badges"><span>{prettyCategory(entry.category)}</span><span>{entry.tier}</span><span className={entry.sandbox_safe ? 'safe' : 'reference'}>{entry.sandbox_safe ? 'sandbox safe' : 'reference only'}</span></div>
+              <pre>{entry.real_syntax}</pre>
+              <p>{entry.description}</p>
+              {entry.rationale && <small className="edu-dictionary-rationale">{entry.rationale}</small>}
+              <code className="edu-concept-id">{entry.concept_id}</code>
+            </article>)}
+          </section> : <div className="edu-dictionary-empty">No Python mappings match these filters.</div>}
+
+          {visibleEntries.length < filteredEntries.length && <button className="edu-dictionary-more" onClick={() => setVisibleLimit((current) => current + DICTIONARY_BATCH_SIZE)}>Load more mappings <ArrowRight /></button>}
+        </>}
       </main>
       <PageFooter />
     </div>
@@ -527,6 +645,7 @@ export function EducationPages({ view, theme, token, onNavigate }: EducationPage
     if (error) return <ErrorScreen message={error} onRetry={() => void loadOverview()} onNavigate={onNavigate} />;
     return <LoadingScreen onNavigate={onNavigate} />;
   }
+  if (view === 'dictionary') return <DictionaryPage theme={theme} token={token} onNavigate={onNavigate} />;
   if (view === 'graduation') return <GraduationPage theme={theme} token={token} progress={progress} onProgressChanged={refreshProgress} onNavigate={onNavigate} />;
   if (view === 'lesson' || view === 'challenge') {
     if (lessonLoading || !lesson) return <LoadingScreen onNavigate={onNavigate} />;

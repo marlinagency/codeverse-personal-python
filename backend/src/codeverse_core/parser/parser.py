@@ -186,7 +186,10 @@ class Parser:
             while self._match(TokenType.DOT):
                 part = self._expect(TokenType.NAME, "modül adı")
                 module += "." + part.resolved_text
-            return nodes.Import(pos=_pos_of(tok), module=module)
+            alias = None
+            if self._match_name("as"):
+                alias = self._expect(TokenType.NAME, "import alias").resolved_text
+            return nodes.Import(pos=_pos_of(tok), module=module, alias=alias)
 
         if self._is_name("from"):
             return self._parse_from_import()

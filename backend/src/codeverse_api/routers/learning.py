@@ -19,6 +19,7 @@ from codeverse_api.schemas.learning import (
     LearnerDiagnosisOut,
     LearningConceptOut,
     LearningDiagnoseRequest,
+    LessonSectionOut,
     LearningModuleOut,
     LearningPathOut,
     LearningProgressOut,
@@ -429,6 +430,19 @@ def _module_out(
         concepts=[_concept_out(concept) for concept in module.concepts],
         bridge_steps=list(module.bridge_steps),
         lesson_steps=list(module.lesson_steps),
+        lesson_sections=[
+            LessonSectionOut(
+                section_id=section.section_id,
+                title=section.title,
+                objective=section.objective,
+                explanation=section.explanation,
+                key_points=list(section.key_points),
+                personal_example=section.personal_example,
+                real_python_example=section.real_python_example,
+                expected_output=section.expected_output,
+            )
+            for section in module.lesson_sections
+        ],
         misconception_checks=list(module.misconception_checks),
         success_criteria=list(module.success_criteria),
         source_content=module.source_content,

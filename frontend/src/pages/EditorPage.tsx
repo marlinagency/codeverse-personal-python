@@ -7,6 +7,7 @@ import { TranslationPanel } from '../components/TranslationPanel';
 import { RunButton } from '../components/RunButton';
 import { AnimatedLandingDemo, EducationPages, type EducationView } from '../components/EducationPages';
 import rocketImage from '../assets/codeverse-rocket.png';
+import { BASE_URL } from '../lib/api';
 
 interface ThemeMapping {
   id: string;
@@ -368,7 +369,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
 
   const fetchThemes = async () => {
     try {
-      const response = await fetch('http://localhost:8000/themes', {
+      const response = await fetch(`${BASE_URL}/themes`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       if (response.ok) {
@@ -426,7 +427,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
 
     const loadBackendLesson = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/themes/${selectedTheme.id}/lesson`, {
+        const response = await fetch(`${BASE_URL}/themes/${selectedTheme.id}/lesson`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (!response.ok) throw new Error('Lesson endpoint failed.');
@@ -462,10 +463,10 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
       setModuleProgress({});
       try {
         const [pathResp, progressResp] = await Promise.all([
-          fetch(`http://localhost:8000/learning/${selectedTheme.id}/path`, {
+          fetch(`${BASE_URL}/learning/${selectedTheme.id}/path`, {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
-          fetch(`http://localhost:8000/learning/${selectedTheme.id}/progress`, {
+          fetch(`${BASE_URL}/learning/${selectedTheme.id}/progress`, {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
         ]);
@@ -522,7 +523,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
       setMasteryReport(null);
       try {
         const response = await fetch(
-          `http://localhost:8000/learning/${selectedTheme.id}/lessons/${selectedLearningModuleId}`,
+          `${BASE_URL}/learning/${selectedTheme.id}/lessons/${selectedLearningModuleId}`,
           { headers: { 'Authorization': `Bearer ${token}` } },
         );
         if (!response.ok) throw new Error('Learning lesson endpoint failed.');
@@ -547,7 +548,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
     setPracticeCheckingId(taskId);
     try {
       const response = await fetch(
-        `http://localhost:8000/learning/${selectedTheme.id}/practice/check`,
+        `${BASE_URL}/learning/${selectedTheme.id}/practice/check`,
         {
           method: 'POST',
           headers: {
@@ -572,7 +573,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
     if (!selectedTheme) return;
     try {
       const response = await fetch(
-        `http://localhost:8000/learning/${selectedTheme.id}/progress`,
+        `${BASE_URL}/learning/${selectedTheme.id}/progress`,
         { headers: { 'Authorization': `Bearer ${token}` } },
       );
       if (!response.ok) return;
@@ -595,7 +596,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
     setCodeRunningId(task.id);
     try {
       const response = await fetch(
-        `http://localhost:8000/learning/${selectedTheme.id}/practice/run`,
+        `${BASE_URL}/learning/${selectedTheme.id}/practice/run`,
         {
           method: 'POST',
           headers: {
@@ -629,7 +630,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
     setIsGrading(true);
     try {
       const response = await fetch(
-        `http://localhost:8000/learning/${selectedTheme.id}/practice/grade`,
+        `${BASE_URL}/learning/${selectedTheme.id}/practice/grade`,
         {
           method: 'POST',
           headers: {
@@ -658,7 +659,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
     setActiveRightTab('output');
 
     try {
-      const response = await fetch('http://localhost:8000/compile', {
+      const response = await fetch(`${BASE_URL}/compile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -715,7 +716,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
     setActiveRightTab('output');
 
     try {
-      const response = await fetch('http://localhost:8000/execute', {
+      const response = await fetch(`${BASE_URL}/execute`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

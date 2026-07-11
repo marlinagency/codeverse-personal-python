@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,11 +19,14 @@ from codeverse_api.schemas.theme import (
     ClarifyingQuestionsOut,
     ClarifyingQuestionsRequest,
     PersonalPythonLessonOut,
+    ThemeDictionaryCatalogOut,
+    ThemeDictionaryEntryOut,
     ThemeDictionaryOut,
     ThemeGenerateRequest,
 )
 from codeverse_api.security.auth import get_current_user_id
 from codeverse_core.cvl.pipeline import CompilationError, CompilationPipeline
+from codeverse_core.data.taxonomy_loader import load_taxonomy
 from codeverse_core.personal_python import build_personal_python_lesson
 from codeverse_core.theme_mapping.clarifying_questions import generate_clarifying_questions
 from codeverse_core.theme_mapping.generator import TaxonomyThemeDictionaryGenerator
@@ -147,6 +151,72 @@ def get_personal_python_lesson(
         target_language=compiled.codegen.target_language,
         used_concepts=lesson.used_concepts,
         focus=list(lesson.focus),
+    )
+
+
+@router.get("/{theme_dictionary_id}/dictionary", response_model=ThemeDictionaryCatalogOut)
+def get_theme_dictionary_catalog(
+    theme_dictionary_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ThemeDictionaryCatalogOut:
+    """Return every Python mapping enriched with canonical taxonomy metadata.
+
+    The normal theme response is optimized for compilation. This catalog is
+    optimized for learning: it tells the UI what each personal token maps to,
+    where it belongs, and whether it is guaranteed to run in the sandbox.
+    """
+    row = ThemeRepository(db).get(theme_dictionary_id)
+    if row is None or row.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="theme dictionary not found")
+
+    taxonomy = {concept.concept_id: concept for concept in load_taxonomy("python")}
+    entries: list[ThemeDictionaryEntryOut] = []
+    for concept_id, personal_token in row.mappings.items():
+        if not concept_id.startswith("py_"):
+            continue
+        concept = taxonomy.get(concept_id)
+        if concept is None:
+            fallback_name = concept_id.removeprefix("py_").replace("_", " ").title()
+            entries.append(
+                ThemeDictionaryEntryOut(
+                    concept_id=concept_id,
+                    personal_token=str(personal_token),
+                    python_name=fallback_name,
+                    real_syntax=fallback_name,
+                    category="additional_python",
+                    tier="core",
+                    description="A named Python concept available in this personal dictionary.",
+                    rationale=(row.rationale or {}).get(concept_id),
+                    sandbox_safe=True,
+                )
+            )
+            continue
+        entries.append(
+            ThemeDictionaryEntryOut(
+                concept_id=concept_id,
+                personal_token=str(personal_token),
+                python_name=concept.title,
+                real_syntax=concept.real_syntax,
+                category=concept.category,
+                tier=concept.tier,
+                description=concept.description,
+                rationale=(row.rationale or {}).get(concept_id),
+                sandbox_safe=concept.is_sandbox_safe,
+            )
+        )
+
+    tier_order = {"core": 0, "builtin": 1, "method": 2, "type": 3, "exception": 4, "library": 5}
+    entries.sort(key=lambda entry: (entry.category, tier_order.get(entry.tier, 9), entry.python_name.casefold()))
+    category_counts = Counter(entry.category for entry in entries)
+    tier_counts = Counter(entry.tier for entry in entries)
+    return ThemeDictionaryCatalogOut(
+        theme_dictionary_id=theme_dictionary_id,
+        theme_name=row.theme_name,
+        total=len(entries),
+        category_counts=dict(sorted(category_counts.items())),
+        tier_counts=dict(sorted(tier_counts.items())),
+        entries=entries,
     )
 
 

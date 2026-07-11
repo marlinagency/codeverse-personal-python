@@ -173,6 +173,26 @@ def test_list_and_get_theme_roundtrip(client: TestClient):
     assert single.json()["id"] == created["id"]
 
 
+def test_theme_dictionary_catalog_enriches_every_python_mapping(client: TestClient):
+    headers = _auth(client)
+    created = _make_theme(client, headers)
+
+    response = client.get(f"/themes/{created['id']}/dictionary", headers=headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    expected_count = sum(1 for key in created["mappings"] if key.startswith("py_"))
+    assert body["total"] == expected_count
+    assert len(body["entries"]) == expected_count
+    assert not any(entry["concept_id"].startswith("sql_") for entry in body["entries"])
+
+    upper = next(entry for entry in body["entries"] if entry["concept_id"] == "py_str_upper")
+    assert upper["personal_token"] == created["mappings"]["py_str_upper"]
+    assert upper["category"] == "string_methods"
+    assert upper["tier"] == "method"
+    assert upper["python_name"]
+    assert upper["real_syntax"]
+
+
 def test_get_missing_theme_returns_404(client: TestClient):
     headers = _auth(client)
     resp = client.get(f"/themes/{uuid.uuid4()}", headers=headers)
@@ -244,6 +264,8 @@ def test_learning_diagnose_path_lesson_practice_and_proof(client: TestClient):
     assert path_body["title"].startswith("Personal Python Path")
     assert len(path_body["modules"]) >= 6
     assert path_body["modules"][0]["module_id"] == "signals-and-values"
+    assert len(path_body["modules"][0]["lesson_sections"]) == 4
+    assert len(path_body["modules"][0]["practice_tasks"]) == 6
 
     lesson = client.get(f"/learning/{created['id']}/lessons/routes", headers=headers)
     assert lesson.status_code == 200, lesson.text
