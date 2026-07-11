@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-5"
 
+    # --- AMD student model (fine-tuned on AMD Instinct, served via vLLM/tunnel) ---
+    #: when true, curated theme chips are answered by our own AMD-hosted model;
+    #: free-typed themes always use the primary provider above. Any AMD failure
+    #: transparently falls back to the primary provider so the app never breaks.
+    amd_enabled: bool = False
+    amd_base_url: str = "http://172.18.0.1:8001/v1"
+    amd_model: str = "codeverse-student"
+
     # --- Database ---
     database_url: str = "postgresql+psycopg://codeverse:codeverse@localhost:5432/codeverse"
 

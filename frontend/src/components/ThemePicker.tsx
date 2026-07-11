@@ -1,7 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, ArrowUp, Plus, Palette, AlertTriangle, X } from 'lucide-react';
 import { BASE_URL } from '../lib/api';
+
+//: These themes are drawn from the exact distribution our AMD-hosted student
+//: model was fine-tuned on, so clicking one routes generation to that model
+//: (with a transparent fallback to the primary provider). Free-typed themes
+//: always use the primary provider.
+const AMD_TUNED_CHIPS: { label: string; icon: string }[] = [
+  { label: 'basketball', icon: '🏀' },
+  { label: 'chess', icon: '♟️' },
+  { label: 'anime', icon: '🌸' },
+  { label: 'Valorant', icon: '🎯' },
+  { label: 'being a chef', icon: '👨‍🍳' },
+  { label: 'car mechanics', icon: '🔧' },
+  { label: 'DJing', icon: '🎧' },
+  { label: 'surfing', icon: '🏄' },
+  { label: 'piano', icon: '🎹' },
+  { label: 'gardening', icon: '🌱' },
+  { label: 'climbing', icon: '🧗' },
+  { label: 'dog training', icon: '🐕' },
+];
 
 interface ThemeMapping {
   id: string;
@@ -62,6 +81,10 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
   const [loadingQuestionsSuccess, setLoadingQuestionsSuccess] = useState(false);
   const [generationSuccess, setGenerationSuccess] = useState(false);
 
+  //: true for the whole flow (questions + generate) when a curated AMD-tuned
+  //: chip started it; a ref so it survives the async wizard steps.
+  const useAmdRef = useRef(false);
+
   useEffect(() => {
     let intervalId: any = null;
 
@@ -120,6 +143,7 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
           theme,
           output_language: 'en',
           clarifying_answers: Object.keys(clarifyingAnswers).length ? clarifyingAnswers : null,
+          use_amd: useAmdRef.current,
         }),
       });
 
@@ -157,7 +181,22 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
 
   const startWizard = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newThemePrompt.trim()) return;
+    // Free-typed submit always uses the primary provider.
+    useAmdRef.current = false;
+    await beginWizard(newThemePrompt);
+  };
+
+  //: Clicking a curated chip: pin the prompt, route the whole flow to the
+  //: AMD-hosted model, and start the same wizard as a normal submit.
+  const startFromChip = async (label: string) => {
+    if (isGenerating || stage !== 'idle') return;
+    useAmdRef.current = true;
+    setNewThemePrompt(label);
+    await beginWizard(label);
+  };
+
+  const beginWizard = async (themeText: string) => {
+    if (!themeText.trim()) return;
 
     setErrorMsg(null);
     setValidationProblems([]);
@@ -173,7 +212,7 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ theme: newThemePrompt }),
+        body: JSON.stringify({ theme: themeText, use_amd: useAmdRef.current }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -200,7 +239,7 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
       // skip the wizard and generate directly from the raw theme, same as
       // before this feature existed.
       setStage('idle');
-      await runGenerate(newThemePrompt, {});
+      await runGenerate(themeText, {});
     }
   };
 
@@ -380,6 +419,28 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
   if (mode === 'hero') {
     return (
       <div className="hero-composer">
+        <div className="amd-chip-rail" role="list" aria-label="Themes tuned on AMD Instinct">
+          <span className="amd-chip-rail-label">
+            <span className="amd-chip-spark" />
+            tuned on AMD Instinct
+          </span>
+          <div className="amd-chip-track">
+            {AMD_TUNED_CHIPS.map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                role="listitem"
+                className="amd-chip"
+                onClick={() => startFromChip(chip.label)}
+                disabled={isGenerating || stage !== 'idle'}
+                title={`Generate "${chip.label}" with our AMD-hosted model`}
+              >
+                <span className="amd-chip-icon">{chip.icon}</span>
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <form onSubmit={startWizard} className="prompt-composer">
           <textarea
             placeholder="describe your world..."

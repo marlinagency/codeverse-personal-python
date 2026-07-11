@@ -1890,6 +1890,94 @@ body::before {
   gap: 12px;
 }
 
+/* --- AMD-tuned theme chips: a flowing rail above the composer --- */
+.amd-chip-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.amd-chip-rail-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cv-blue);
+  opacity: 0.85;
+}
+
+.amd-chip-spark {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #4fd1c5, var(--cv-blue));
+  box-shadow: 0 0 0 0 rgba(79, 209, 197, 0.6);
+  animation: amd-spark-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes amd-spark-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(79, 209, 197, 0.55); }
+  50% { box-shadow: 0 0 0 6px rgba(79, 209, 197, 0); }
+}
+
+/* Masked, auto-scrolling track that pauses on hover so it stays clickable. */
+.amd-chip-track {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 2px;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.amd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1.5px solid rgba(20, 95, 201, 0.28);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 253, 247, 0.95), rgba(236, 243, 253, 0.9));
+  color: var(--cv-ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  animation: amd-chip-float 6s ease-in-out infinite;
+}
+
+.amd-chip:nth-child(3n) { animation-delay: -1.5s; }
+.amd-chip:nth-child(3n + 1) { animation-delay: -3s; }
+.amd-chip:nth-child(3n + 2) { animation-delay: -4.5s; }
+
+@keyframes amd-chip-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.amd-chip:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--cv-blue);
+  background: linear-gradient(180deg, #ffffff, #e6f0ff);
+  box-shadow: 0 6px 18px rgba(20, 95, 201, 0.18);
+}
+
+.amd-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+  animation: none;
+}
+
+.amd-chip-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
 .prompt-composer {
   position: relative;
   display: grid;

@@ -43,6 +43,16 @@ def build_llm_provider(settings: Settings) -> LLMProvider:
     )
 
 
+def build_amd_provider(settings: Settings) -> OpenAICompatibleProvider:
+    """Our own model, fine-tuned on an AMD Instinct GPU and served over a
+    reverse tunnel. Reached only for curated theme chips; see themes router."""
+    return OpenAICompatibleProvider(
+        base_url=settings.amd_base_url,
+        api_key="not-needed",
+        model=settings.amd_model,
+    )
+
+
 def get_llm_provider(settings: Settings = Depends(get_settings)) -> LLMProvider:
     return build_llm_provider(settings)
 
@@ -88,4 +98,5 @@ __all__ = [
     "get_compilation_pipeline",
     "get_sandbox_runner",
     "build_llm_provider",
+    "build_amd_provider",
 ]
