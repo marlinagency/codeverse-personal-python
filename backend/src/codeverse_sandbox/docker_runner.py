@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import os
 import shutil
 import tempfile
 import time
@@ -150,8 +151,18 @@ class DockerSandboxRunner:
 
 @contextmanager
 def _temporary_workspace() -> Iterator[Path]:
-    """Create a writable workspace without Windows TemporaryDirectory ACL issues."""
-    base = Path(tempfile.gettempdir()).resolve()
+    """Create a writable workspace without Windows TemporaryDirectory ACL issues.
+
+    When the backend itself runs inside a container talking to the HOST docker
+    daemon, bind-mount paths are resolved on the host — so the workspace must
+    live on a directory mounted into the backend at the SAME path it has on
+    the host. CODEVERSE_SANDBOX_WORKSPACE_DIR names that shared directory;
+    unset (local dev on the host) falls back to the system temp dir.
+    """
+    base = Path(
+        os.environ.get("CODEVERSE_SANDBOX_WORKSPACE_DIR") or tempfile.gettempdir()
+    ).resolve()
+    base.mkdir(parents=True, exist_ok=True)
     path = base / f"codeverse-sandbox-{uuid.uuid4().hex}"
     path.mkdir(parents=False, exist_ok=False)
     try:

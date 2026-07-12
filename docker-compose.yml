@@ -23,6 +23,11 @@ services:
       - .env
     environment:
       CODEVERSE_DATABASE_URL: postgresql+psycopg://codeverse:codeverse@postgres:5432/codeverse
+      # Sandbox workspaces must live on a host path mounted into this
+      # container at the SAME path: bind mounts are resolved by the HOST
+      # daemon, so a workspace under the container's own /tmp would arrive
+      # empty inside the sibling runtime container.
+      CODEVERSE_SANDBOX_WORKSPACE_DIR: /opt/codeverse/.sandbox
     expose:
       - "8000"
     depends_on:
@@ -33,6 +38,7 @@ services:
     # this backend container. Mounting the host socket is required for that.
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/codeverse/.sandbox:/opt/codeverse/.sandbox
 
   frontend:
     build:
