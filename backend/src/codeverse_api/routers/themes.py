@@ -43,13 +43,6 @@ from codeverse_core.theme_mapping.validator import ThemeDictionaryValidationErro
 router = APIRouter(prefix="/themes", tags=["themes"])
 
 
-def _amd_generator(settings: Settings) -> TaxonomyThemeDictionaryGenerator | None:
-    """A generator backed by our AMD-hosted model, or None when it's disabled."""
-    if not settings.amd_enabled:
-        return None
-    return TaxonomyThemeDictionaryGenerator(build_amd_provider(settings))  # type: ignore
-
-
 @router.post("/generate", response_model=ThemeDictionaryOut, status_code=status.HTTP_201_CREATED)
 def generate_theme(
     body: ThemeGenerateRequest,
@@ -65,11 +58,9 @@ def generate_theme(
     # never breaks for the visitor.
     active_generator = generator
     active_provider = provider
-    if body.use_amd:
-        amd_gen = _amd_generator(settings)
-        if amd_gen is not None:
-            active_generator = amd_gen
-            active_provider = amd_gen.provider  # type: ignore[attr-defined]
+    if body.use_amd and settings.amd_enabled:
+        active_provider = build_amd_provider(settings)
+        active_generator = TaxonomyThemeDictionaryGenerator(active_provider)  # type: ignore
 
     def _run(gen: TaxonomyThemeDictionaryGenerator):
         return gen.generate_profile_seeded(
