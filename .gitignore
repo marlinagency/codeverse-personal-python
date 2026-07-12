@@ -15,7 +15,10 @@ frontend/dist/
 # local data / scratch
 codeverse.db
 .tmp/
-amd/*.jsonl
+# amd/codeverse_theme_sft.jsonl is committed on purpose — the real,
+# Fireworks-generated distillation dataset used for the AMD fine-tune, kept
+# as verifiable hackathon evidence. Only the tiny pilot run stays ignored.
+amd/pilot_sft.jsonl
 
 # editors / os
 .vscode/
