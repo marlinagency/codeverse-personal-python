@@ -284,6 +284,10 @@ _PERSONAL_PYTHON_COMPACT_IDS = frozenset(_PERSONAL_PYTHON_CORE_IDS) | frozenset(
     }
 )
 
+#: public alias: the generator aligns its in-flight token-length rule with
+#: this gate so a token can never pass generation yet fail the final gate.
+PERSONAL_PYTHON_COMPACT_IDS = _PERSONAL_PYTHON_COMPACT_IDS
+
 _PERSONAL_BAD_TOKEN_PARTS = frozenset(
     {
         "theme",

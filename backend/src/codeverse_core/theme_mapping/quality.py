@@ -89,18 +89,32 @@ def assess_dictionary_quality(
             * 100
         )
 
-    semantic_hits = 0
-    for canonical, token in canonical_tokens.items():
+    # Semantic axis: a mapping earns its point when its explanation is (a)
+    # present and free of filler, (b) tied to THIS token (the token's stem
+    # appears in the text, so the cue and the story match), and (c) specific
+    # (the same sentence isn't stamped verbatim onto many concepts). Single
+    # -word tokens are fine — brevity and semantics must not fight.
+    canonical_rationales: dict[str, str] = {}
+    text_reuse: Counter[str] = Counter()
+    for canonical in canonical_tokens:
         concept_ids = [cid for cid, name in canonical_by_id.items() if name == canonical]
         texts = [rationale.get(cid, "") for cid in concept_ids]
-        text = next((item for item in texts if item), "").casefold()
+        text = next((item for item in texts if item), "").strip()
+        canonical_rationales[canonical] = text
+        if text:
+            text_reuse[text.casefold()] += 1
+
+    semantic_hits = 0
+    for canonical, token in canonical_tokens.items():
+        text = canonical_rationales[canonical]
+        folded_text = text.casefold()
         has_clean_rationale = bool(text) and not any(
-            phrase in text for phrase in _BAD_RATIONALE_PHRASES
+            phrase in folded_text for phrase in _BAD_RATIONALE_PHRASES
         )
-        has_behavior_shape = "_" in token or canonical in {
-            "if", "elif", "else", "for", "def", "return", "print", "input"
-        }
-        if has_clean_rationale and has_behavior_shape:
+        stem = token.casefold().split("_", 1)[0]
+        tied_to_token = bool(stem) and stem in folded_text
+        behavior_specific = bool(text) and text_reuse[folded_text] <= 3
+        if has_clean_rationale and tied_to_token and behavior_specific:
             semantic_hits += 1
     semantic_score = round(100 * semantic_hits / len(tokens))
 

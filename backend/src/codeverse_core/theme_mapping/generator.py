@@ -36,6 +36,7 @@ from codeverse_core.theme_mapping.theme_families import (
     detect_domain as _domain_theme_key,
 )
 from codeverse_core.theme_mapping.validator import (
+    PERSONAL_PYTHON_COMPACT_IDS,
     ThemeDictionaryValidationError,
     validate_personal_python_dictionary_quality,
     validate_mappings,
@@ -348,11 +349,15 @@ class TaxonomyThemeDictionaryGenerator:
         rationale: dict[str, str] = {}
         used_tokens: dict[str, str] = {}
         summaries: list[TaxonomyBatchSummary] = []
+        # Quality-first: one extra LLM pass proposes bespoke tokens for the
+        # ~50 concepts learners type most (if/for/def/print/...). Slower by
+        # design — product call: better names beat faster generation. Degrades
+        # gracefully to the deterministic path when the call fails.
         critical_overrides = self._generate_critical_overrides(
             profile,
             batches,
             all_canonical_names,
-            enabled=False,
+            enabled=True,
         )
 
         # Reserve concise names for the concepts learners type most often
@@ -437,6 +442,20 @@ class TaxonomyThemeDictionaryGenerator:
                 require_python_only=True,
             )
             if quality_problems:
+                # A single bad token must never sink the whole request: repair
+                # the named concepts in place and re-run the gate. Only truly
+                # unrepairable output still raises.
+                quality_problems = self._auto_repair_gate_problems(
+                    profile,
+                    batches,
+                    quality_problems,
+                    mappings,
+                    rationale,
+                    used_tokens,
+                    all_canonical_names,
+                    reserved_preferred_tokens,
+                )
+            if quality_problems:
                 raise TaxonomyGenerationError(
                     "Personal Python dictionary failed quality gate: "
                     + "; ".join(quality_problems[:8])
@@ -452,6 +471,109 @@ class TaxonomyThemeDictionaryGenerator:
             provider_name=self._provider.provider_name,
             model=str(getattr(self._provider, "model", "")),
         )
+
+    def _auto_repair_gate_problems(
+        self,
+        profile: ThemeProfile,
+        batches: list[_TaxonomyBatch],
+        problems: list[str],
+        mappings: dict[str, str],
+        rationale: dict[str, str],
+        used_tokens: dict[str, str],
+        all_canonical_names: set[str],
+        reserved_preferred_tokens: dict[str, str],
+    ) -> list[str]:
+        """Repair final-gate failures in place instead of failing the request.
+
+        The gate names offending concept_ids ("py_set_add: token ... is too
+        long for learning UI"); each named concept gets its token regenerated
+        under the strictest rules — with a deterministic shortening fallback —
+        and the gate re-runs. Returns whatever problems remain (empty on
+        success).
+        """
+        concept_by_id = {
+            concept_id: concept
+            for batch in batches
+            for concept in batch.concepts
+            for concept_id in concept.concept_ids
+        }
+        motif_slugs = _profile_motif_slugs(profile, profile.clean_theme or profile.theme)
+
+        for _round in range(3):
+            offending: list[str] = []
+            for problem in problems:
+                concept_id = problem.split(":", 1)[0].strip()
+                if concept_id in concept_by_id and concept_id not in offending:
+                    offending.append(concept_id)
+            if not offending:
+                return problems
+
+            repaired_any = False
+            seen_canonicals: set[str] = set()
+            for concept_id in offending:
+                concept = concept_by_id[concept_id]
+                if concept.canonical_name in seen_canonicals:
+                    continue
+                seen_canonicals.add(concept.canonical_name)
+
+                old_token = mappings.get(concept_id, "")
+                if old_token and used_tokens.get(_fold(old_token)) == concept.canonical_name:
+                    used_tokens.pop(_fold(old_token), None)
+
+                token = _unique_profile_token(
+                    profile,
+                    motif_slugs,
+                    concept,
+                    used_tokens,
+                    all_canonical_names,
+                    reserved_preferred_tokens,
+                )
+                token, _ = _repair_mapping_quality(
+                    profile,
+                    concept,
+                    token,
+                    _profile_rationale(profile, concept, token),
+                    used_tokens,
+                    all_canonical_names,
+                    reserved_preferred_tokens,
+                )
+
+                # Deterministic last resort: force the gate's own length
+                # budget so this round always converges.
+                limit = 16 if any(
+                    cid in PERSONAL_PYTHON_COMPACT_IDS for cid in concept.concept_ids
+                ) else 20
+                if len(token) > limit or len([p for p in token.split("_") if p]) > 2:
+                    if used_tokens.get(_fold(token)) == concept.canonical_name:
+                        used_tokens.pop(_fold(token), None)
+                    stem = (_compact_slug(token) or token.split("_", 1)[0])[:limit]
+                    candidate = stem
+                    index = 2
+                    while not _is_available_generated_token(
+                        candidate, used_tokens, all_canonical_names
+                    ):
+                        suffix = str(index)
+                        candidate = f"{stem[: max(1, limit - len(suffix) - 1)]}_{suffix}"
+                        index += 1
+                    token = candidate
+                    used_tokens[_fold(token)] = concept.canonical_name
+
+                if token != old_token:
+                    repaired_any = True
+                for cid in concept.concept_ids:
+                    mappings[cid] = token
+                    rationale[cid] = _profile_rationale(profile, concept, token)
+
+            problems = validate_personal_python_dictionary_quality(
+                mappings,
+                rationale,
+                require_python_only=True,
+            )
+            if not problems:
+                return []
+            if not repaired_any:
+                break
+        return problems
 
     def _generate_critical_overrides(
         self,
@@ -1506,7 +1628,12 @@ def _quality_issues(
     raw_prompt = profile.theme.casefold()
     rationale_folded = rationale.casefold()
 
-    compact_learning_token = folded_name in _COMPACT_LEARNING_CONCEPTS
+    # Aligned with validate_personal_python_dictionary_quality: any concept
+    # whose ids fall in the gate's compact set gets the same 16-char budget
+    # here, so generation can never emit a token the final gate would reject.
+    compact_learning_token = folded_name in _COMPACT_LEARNING_CONCEPTS or any(
+        concept_id in PERSONAL_PYTHON_COMPACT_IDS for concept_id in concept.concept_ids
+    )
     python_token = concept.language == "python"
     max_parts = 2 if python_token else 3
     max_length = 16 if compact_learning_token else (20 if python_token else 36)
@@ -2021,57 +2148,57 @@ _KIND_LABELS: dict[str, str] = {
 
 
 _RATIONALE_TEMPLATES: dict[str, str] = {
-    "def": "{motif}, {theme} dünyasında tekrar kullanılabilir bir yetenek tanımlar",
-    "return": "{motif}, işlem tamamlandığında sonucu geri taşır",
-    "yield": "{motif}, akış sürerken sıradaki değeri üretir",
-    "if": "{motif}, belirli koşul gerçekleştiğinde sahneye girer",
-    "elif": "{motif}, ilk koşul tutmazsa alternatif durumu dener",
-    "else": "{motif}, hiçbir koşul tutmadığında diğer yolu açar",
-    "for": "{motif}, koleksiyondaki öğeleri sırayla dolaşır",
-    "in": "{motif}, bir öğenin kapsama/desteye ait olduğunu anlatır",
-    "while": "{motif}, koşul sürdükçe devriye gibi devam eder",
-    "break": "{motif}, devam eden akışı anında sonlandırır",
-    "continue": "{motif}, mevcut adımı atlayıp sıradakine geçer",
-    "class": "{motif}, nesneler için ortak bir şablon kurar",
-    "import": "{motif}, dışarıdaki aracı/kaynağı içeri çağırır",
-    "try": "{motif}, riskli hamleyi kontrollü şekilde dener",
-    "except": "{motif}, başarısız hamleyi yakalayıp ele alır",
-    "finally": "{motif}, sonuç ne olursa olsun son temizliği yapar",
-    "and": "{motif}, iki şartın birlikte doğru olmasını ister",
-    "or": "{motif}, alternatif yollardan birinin yetmesini anlatır",
-    "not": "{motif}, şartın tersini kontrol eder",
-    "True": "{motif}, doğru/aktif kararı temsil eder",
-    "False": "{motif}, yanlış/pasif kararı temsil eder",
-    "None": "{motif}, bilinçli boşluğu veya yokluğu temsil eder",
-    "print": "{motif}, sonucu ekrana veya sahneye duyurur",
-    "range": "{motif}, sayısal bir menzil/rota oluşturur",
-    "len": "{motif}, eldeki şeyin uzunluğunu veya sayısını ölçer",
-    "append": "{motif}, listeye yeni bir parça ekler",
-    "remove": "{motif}, koleksiyondan hedef parçayı çıkarır",
-    "get": "{motif}, anahtar üzerinden değeri güvenli biçimde alır",
-    "keys": "{motif}, sözlüğün bütün anahtarlarını açığa çıkarır",
-    "values": "{motif}, sözlüğün bütün değerlerini gösterir",
-    "select": "{motif}, tablodan istenen veriyi seçer",
-    "where": "{motif}, sorguyu belirli koşula göre süzer",
-    "left_join": "{motif}, sol taraftaki kayıtları koruyarak tabloları bağlar",
-    "right_join": "{motif}, sağ taraftaki kayıtları koruyarak tabloları bağlar",
-    "inner_join": "{motif}, yalnızca eşleşen kayıtları birleştirir",
-    "count": "{motif}, eşleşen kayıtları veya öğeleri sayar",
-    "sum": "{motif}, değerleri tek toplamda toplar",
-    "avg": "{motif}, değerlerin ortalamasını çıkarır",
-    "min": "{motif}, en küçük değeri bulur",
-    "max": "{motif}, en büyük değeri bulur",
-    "group_by": "{motif}, kayıtları ortak özelliğe göre gruplar",
-    "order_by": "{motif}, sonucu belirlenen sıraya dizer",
-    "insert_into": "{motif}, tabloya yeni kayıt ekler",
-    "update": "{motif}, mevcut kaydı yeni değerlerle günceller",
-    "delete": "{motif}, hedef kaydı tablodan kaldırır",
-    "create_table": "{motif}, yeni bir tablo yapısı kurar",
-    "drop_table": "{motif}, tabloyu tamamen ortadan kaldırır",
-    "alter_table": "{motif}, tablonun yapısını değiştirir",
-    "primary_key": "{motif}, kaydı benzersiz tanıtan ana işarettir",
-    "not_null": "{motif}, alanın boş bırakılamayacağını söyler",
-    "unique": "{motif}, değerin tekil kalmasını zorunlu kılar",
+    "def": "{motif} defines a reusable ability in the {theme} world",
+    "return": "{motif} carries the result back once the action completes",
+    "yield": "{motif} hands out the next value while the flow keeps going",
+    "if": "{motif} steps in when a specific condition holds",
+    "elif": "{motif} tries the alternative case when the first check fails",
+    "else": "{motif} opens the remaining path when no condition holds",
+    "for": "{motif} visits the items of a collection one by one",
+    "in": "{motif} tells whether an item belongs to a collection",
+    "while": "{motif} keeps going as long as the condition stays true",
+    "break": "{motif} ends the ongoing flow immediately",
+    "continue": "{motif} skips the current step and moves to the next one",
+    "class": "{motif} sets up a shared blueprint for objects",
+    "import": "{motif} brings an outside tool into the scene",
+    "try": "{motif} attempts the risky move in a controlled way",
+    "except": "{motif} catches the failed move and handles it",
+    "finally": "{motif} runs the final cleanup no matter the outcome",
+    "and": "{motif} requires both conditions to be true together",
+    "or": "{motif} lets any one of the alternatives be enough",
+    "not": "{motif} checks the opposite of the condition",
+    "True": "{motif} stands for the yes/active decision",
+    "False": "{motif} stands for the no/inactive decision",
+    "None": "{motif} stands for a deliberate blank or absence",
+    "print": "{motif} announces the result out loud",
+    "range": "{motif} lays out a numeric span to travel through",
+    "len": "{motif} measures how many items something holds",
+    "append": "{motif} adds a new piece to the end of the list",
+    "remove": "{motif} takes the target piece out of the collection",
+    "get": "{motif} safely fetches the value behind a key",
+    "keys": "{motif} reveals every key stored in the mapping",
+    "values": "{motif} shows every value stored in the mapping",
+    "select": "{motif} picks the requested data from the table",
+    "where": "{motif} filters the query down to a condition",
+    "left_join": "{motif} links tables while keeping every left-side row",
+    "right_join": "{motif} links tables while keeping every right-side row",
+    "inner_join": "{motif} combines only the rows that match",
+    "count": "{motif} counts the matching rows or items",
+    "sum": "{motif} adds the values into a single total",
+    "avg": "{motif} works out the average of the values",
+    "min": "{motif} finds the smallest value",
+    "max": "{motif} finds the largest value",
+    "group_by": "{motif} groups records by a shared property",
+    "order_by": "{motif} arranges the result in the chosen order",
+    "insert_into": "{motif} adds a new record to the table",
+    "update": "{motif} refreshes an existing record with new values",
+    "delete": "{motif} removes the target record from the table",
+    "create_table": "{motif} builds a brand-new table structure",
+    "drop_table": "{motif} removes the table entirely",
+    "alter_table": "{motif} reshapes the table's structure",
+    "primary_key": "{motif} is the mark that uniquely identifies a record",
+    "not_null": "{motif} says the field can never be left empty",
+    "unique": "{motif} forces the value to stay one of a kind",
 }
 
 
