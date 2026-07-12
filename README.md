@@ -20,7 +20,7 @@ Built for the AMD Developer Hackathon (Track 3).
 4. **Write and run it for real** — a lexer → parser (UASL) → codegen pipeline
    compiles your personal syntax to real Python, executed in Docker-sandboxed
    containers. Errors come back translated into your theme's vocabulary.
-5. **Learn through a real curriculum** — a diagnosis-driven 9-module path
+5. **Learn through a real curriculum** — a diagnosis-driven 14-module path
    (conditions → loops → functions → collections → OOP → errors) with:
    - runnable themed lessons and side-by-side real-Python previews
    - quiz practice with hints, teaching feedback, and mastery grading
@@ -75,6 +75,15 @@ cd frontend && npm install && npm run dev   # http://localhost:5173
 
 Copy `.env.example` → `.env` and set `CODEVERSE_LLM_PROVIDER=fireworks` +
 your API key (or leave `fake` for a fully offline deterministic demo).
+
+## Record the automated product story
+
+Open `http://127.0.0.1:5173/?demo=1` and select **Prepare live demo**. The
+preflight reuses a clean generated dictionary when available, validates the
+learning APIs, and compiles/runs the presentation program against the real
+backend. After it passes, use **Start presentation** for the automatic
+91-second product story. The director includes pause, scene navigation,
+restart, fullscreen, playback speed, subtitles, and optional browser voice.
 
 ## Deploy the public demo
 

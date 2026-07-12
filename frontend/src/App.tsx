@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { EditorPage } from './pages/EditorPage';
 import { AlertCircle } from 'lucide-react';
 import { BASE_URL } from './lib/api';
+import { DemoDirector } from './components/DemoDirector';
 
 interface User {
   id: string;
@@ -75,7 +76,9 @@ function App() {
   }
 
   return (
-    <EditorPage token={token!} user={user} />
+    new URLSearchParams(window.location.search).get('demo') === '1'
+      ? <DemoDirector token={token!} />
+      : <EditorPage token={token!} user={user} />
   );
 }
 
