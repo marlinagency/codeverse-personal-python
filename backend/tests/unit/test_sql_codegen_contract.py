@@ -26,8 +26,8 @@ def test_sql_rejects_too_many_function_arguments():
 
     diagnostic = raised.value.diagnostics[0]
     assert diagnostic.stage == "codegen"
-    assert "1 argüman" in diagnostic.message
-    assert "2 verildi" in diagnostic.message
+    assert "1 arguments" in diagnostic.message
+    assert "2 given" in diagnostic.message
 
 
 def test_sql_allows_omitted_default_arguments():
@@ -46,7 +46,7 @@ def test_sql_rejects_wrong_collection_mutation_arity():
 
     diagnostic = raised.value.diagnostics[0]
     assert diagnostic.stage == "codegen"
-    assert "'accrete' 1 argüman alır, 0 verildi" in diagnostic.message
+    assert "'accrete' takes 1 arguments, 0 given" in diagnostic.message
 
 
 def test_sql_rejects_wrong_class_method_arguments():
@@ -62,7 +62,7 @@ def test_sql_rejects_wrong_class_method_arguments():
 
     diagnostic = raised.value.diagnostics[0]
     assert diagnostic.stage == "codegen"
-    assert "'Oyuncu.ekle' 1 argüman alır, 0 verildi" in diagnostic.message
+    assert "'Oyuncu.ekle' takes 1 arguments, 0 given" in diagnostic.message
 
 
 def test_sql_mutating_class_method_updates_statement_target():

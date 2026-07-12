@@ -41,20 +41,20 @@ def test_missing_header_key():
 
 
 def test_unknown_header_key():
-    with pytest.raises(CvlFormatError, match="bilinmeyen"):
+    with pytest.raises(CvlFormatError, match="unknown"):
         parse_cvl("@theme: a\n@mode: x\n@language: python\n@version: 1\n---\n")
 
 
 def test_duplicate_header_key():
-    with pytest.raises(CvlFormatError, match="iki kez"):
+    with pytest.raises(CvlFormatError, match="twice"):
         parse_cvl("@theme: a\n@theme: b\n@language: python\n@version: 1\n---\n")
 
 
 def test_bad_version():
-    with pytest.raises(CvlFormatError, match="tamsayı"):
+    with pytest.raises(CvlFormatError, match="integer"):
         parse_cvl("@theme: a\n@language: python\n@version: bir\n---\n")
 
 
 def test_unsupported_version():
-    with pytest.raises(CvlFormatError, match="sürüm"):
+    with pytest.raises(CvlFormatError, match="version"):
         parse_cvl("@theme: a\n@language: python\n@version: 99\n---\n")

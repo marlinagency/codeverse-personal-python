@@ -41,7 +41,7 @@ class CompilationError(Exception):
     def __init__(self, diagnostics: list[Diagnostic]) -> None:
         self.diagnostics = diagnostics
         first = diagnostics[0]
-        super().__init__(f"{first.message} (satır {first.line})")
+        super().__init__(f"{first.message} (line {first.line})")
 
 
 @dataclass(frozen=True)
@@ -84,8 +84,8 @@ class CompilationPipeline:
             raise CompilationError(
                 [
                     self._diagnostic(
-                        "kaynak kod boş — '---' ayracından sonra en az bir ifade "
-                        "yazılmalı (yorumlar ve boş satırlar sayılmaz)",
+                        "source is empty — write at least one statement "
+                        "after the '---' separator (comments and blank lines do not count)",
                         offset + 1,
                         1,
                         "parse",

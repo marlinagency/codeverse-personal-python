@@ -140,10 +140,10 @@ class PythonEmitter:
                 nodes.SqlDropDatabase,
             ),
         ):
-            raise CodegenError("SQL sorgu ifadeleri Python hedefinde desteklenmiyor", stmt)
+            raise CodegenError("SQL query statements are not supported by the Python target", stmt)
         else:
             raise CodegenError(
-                f"Python üretici bu yapıyı desteklemiyor: {type(stmt).__name__}", stmt
+                f"the Python generator does not support this construct: {type(stmt).__name__}", stmt
             )
 
     def _emit_function(self, fn: nodes.FunctionDef, in_class: bool = False) -> None:
@@ -181,7 +181,7 @@ class PythonEmitter:
     def _emit_try(self, stmt: nodes.TryExcept) -> None:
         if len(stmt.handlers) > 1:
             raise CodegenError(
-                "birden fazla hata yakalama bloğu desteklenmiyor — tek blok kullanın",
+                "multiple except blocks are not supported — use a single block",
                 stmt.handlers[1],
             )
         self._line("try:")
@@ -232,7 +232,7 @@ class PythonEmitter:
             if none_comparison is not None:
                 return none_comparison
             if expr.op == "like":
-                raise CodegenError("'like' yalnizca SQL hedefinde desteklenir", expr)
+                raise CodegenError("'like' is only supported by the SQL target", expr)
             return f"({self._expr(expr.left)} {expr.op} {self._expr(expr.right)})"
         if isinstance(expr, nodes.BetweenOp):
             target = self._expr(expr.expr)
@@ -272,7 +272,7 @@ class PythonEmitter:
         if isinstance(expr, nodes.Star):
             return "*"
         raise CodegenError(
-            f"Python üretici bu ifadeyi desteklemiyor: {type(expr).__name__}", expr
+            f"the Python generator does not support this expression: {type(expr).__name__}", expr
         )
 
     def _pattern(self, expr: nodes.Node) -> str:
@@ -300,8 +300,8 @@ class PythonEmitter:
         if method in ("set", "delete"):
             shown = expr.themed_method or method
             raise CodegenError(
-                f"'{shown}' yalnızca kendi başına bir satır olarak kullanılabilir, "
-                "bir ifadenin içinde değil",
+                f"'{shown}' can only be used as a statement on its own line, "
+                "not inside an expression",
                 expr,
             )
         # user-defined method on an object

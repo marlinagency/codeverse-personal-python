@@ -19,17 +19,17 @@ def test_clean_program_no_errors():
 
 def test_undefined_name_reported():
     errors = check("print(tanimsiz)")
-    assert any("tanimsiz" in e.message for e in errors)
+    assert any("undefined name" in e.message and "tanimsiz" in e.message for e in errors)
 
 
 def test_return_outside_function():
     errors = check("return 5")
-    assert any("fonksiyon dışında" in e.message for e in errors)
+    assert any("outside a function" in e.message for e in errors)
 
 
 def test_break_outside_loop():
     errors = check("break")
-    assert any("döngü dışında" in e.message for e in errors)
+    assert any("outside a loop" in e.message for e in errors)
 
 
 def test_forward_function_reference_ok():
@@ -41,17 +41,17 @@ def test_forward_function_reference_ok():
 
 def test_duplicate_function_reported():
     errors = check("func f():\n    return 1\nfunc f():\n    return 2")
-    assert any("zaten tanımlı" in e.message for e in errors)
+    assert any("already defined" in e.message for e in errors)
 
 
 def test_duplicate_function_parameter_reported():
     errors = check("func f(a, a):\n    return a")
-    assert any("parametre" in e.message and "iki kez" in e.message for e in errors)
+    assert any("parameter" in e.message and "defined twice" in e.message for e in errors)
 
 
 def test_required_parameter_after_default_reported():
     errors = check("func f(a = 1, b):\n    return b")
-    assert any("varsay" in e.message for e in errors)
+    assert any("required parameter" in e.message for e in errors)
 
 
 def test_duplicate_class_field_and_method_reported():
@@ -64,8 +64,8 @@ def test_duplicate_class_field_and_method_reported():
         "    func ekle(y):\n"
         "        return y\n"
     )
-    assert any("alan" in e.message and "iki kez" in e.message for e in errors)
-    assert any("metod" in e.message and "iki kez" in e.message for e in errors)
+    assert any("field" in e.message and "defined twice" in e.message for e in errors)
+    assert any("method" in e.message and "defined twice" in e.message for e in errors)
 
 
 def test_loop_variable_defined_in_body():
@@ -89,7 +89,7 @@ def test_assignment_to_python_builtin_name_is_rejected_before_runtime():
 
     errors = validate_program(program, known_globals_for_language("python"))
 
-    assert any("yerlesik Python kavrami" in e.message and "dict" in e.message for e in errors)
+    assert any("built-in Python concept" in e.message and "dict" in e.message for e in errors)
 
 
 def test_loop_variable_cannot_shadow_python_builtin_name():
@@ -98,4 +98,4 @@ def test_loop_variable_cannot_shadow_python_builtin_name():
 
     errors = validate_program(program, known_globals_for_language("python"))
 
-    assert any("yerlesik Python kavrami" in e.message and "print" in e.message for e in errors)
+    assert any("built-in Python concept" in e.message and "print" in e.message for e in errors)

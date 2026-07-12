@@ -8,4 +8,4 @@ class LexError(Exception):
         self.message = message
         self.line = line
         self.col = col
-        super().__init__(f"{message} (satır {line}, sütun {col})")
+        super().__init__(f"{message} (line {line}, col {col})")

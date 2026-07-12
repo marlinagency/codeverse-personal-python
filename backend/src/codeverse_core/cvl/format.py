@@ -22,7 +22,7 @@ class CvlFormatError(Exception):
     def __init__(self, message: str, line: int = 1) -> None:
         self.message = message
         self.line = line
-        super().__init__(f"{message} (satır {line})")
+        super().__init__(f"{message} (line {line})")
 
 
 @dataclass(frozen=True)
@@ -51,42 +51,42 @@ def parse_cvl(content: str) -> CvlDocument:
         if not line.startswith("@"):
             if all(k in header for k in ("theme", "language", "version")):
                 raise CvlFormatError(
-                    "başlığı gövdeden ayıran '---' satırı eksik",
+                    "missing the '---' line that separates the header from the body",
                     i + 1,
                 )
             raise CvlFormatError(
-                "başlıkta her satır '@anahtar: değer' biçiminde olmalı "
-                "(ör. '@theme: valorant')",
+                "every header line must be in '@key: value' form "
+                "(e.g. '@theme: valorant')",
                 i + 1,
             )
         if ":" not in line:
-            raise CvlFormatError(f"başlık satırında ':' eksik: {line!r}", i + 1)
+            raise CvlFormatError(f"header line is missing ':': {line!r}", i + 1)
         key, _, value = line[1:].partition(":")
         key = key.strip().lower()
         value = value.strip()
         if key not in ("theme", "language", "version"):
-            raise CvlFormatError(f"bilinmeyen başlık anahtarı: '@{key}'", i + 1)
+            raise CvlFormatError(f"unknown header key: '@{key}'", i + 1)
         if key in header:
-            raise CvlFormatError(f"'@{key}' başlığı iki kez tanımlanmış", i + 1)
+            raise CvlFormatError(f"header '@{key}' is defined twice", i + 1)
         if not value:
-            raise CvlFormatError(f"'@{key}' başlığının değeri boş", i + 1)
+            raise CvlFormatError(f"header '@{key}' has an empty value", i + 1)
         header[key] = value
 
     if separator_index is None:
-        raise CvlFormatError("başlığı gövdeden ayıran '---' satırı eksik")
+        raise CvlFormatError("missing the '---' line that separates the header from the body")
 
     missing = [k for k in ("theme", "language", "version") if k not in header]
     if missing:
         raise CvlFormatError(
-            "eksik başlık(lar): " + ", ".join(f"@{k}" for k in missing)
+            "missing header(s): " + ", ".join(f"@{k}" for k in missing)
         )
 
     try:
         version = int(header["version"])
     except ValueError:
-        raise CvlFormatError(f"@version bir tamsayı olmalı: {header['version']!r}") from None
+        raise CvlFormatError(f"@version must be an integer: {header['version']!r}") from None
     if version not in SUPPORTED_FORMAT_VERSIONS:
-        raise CvlFormatError(f"desteklenmeyen format sürümü: {version}")
+        raise CvlFormatError(f"unsupported format version: {version}")
 
     return CvlDocument(
         theme=header["theme"],

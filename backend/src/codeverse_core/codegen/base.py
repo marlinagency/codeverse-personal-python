@@ -31,7 +31,7 @@ class CodegenError(Exception):
         self.message = message
         self.line = node.pos.line
         self.col = node.pos.col
-        super().__init__(f"{message} (satır {self.line}, sütun {self.col})")
+        super().__init__(f"{message} (line {self.line}, col {self.col})")
 
 
 class CodegenModule(ABC):

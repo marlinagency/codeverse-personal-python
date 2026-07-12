@@ -20,7 +20,7 @@ class ParseError(Exception):
         self.line = line
         self.col = col
         self.hint = hint
-        text = f"{message} (satır {line}, sütun {col})"
+        text = f"{message} (line {line}, col {col})"
         if hint:
             text += f" — {hint}"
         super().__init__(text)

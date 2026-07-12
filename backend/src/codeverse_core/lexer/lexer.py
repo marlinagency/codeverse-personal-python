@@ -82,8 +82,8 @@ class Lexer:
                         tokens.append(Token(TokenType.DEDENT, "", "", line_no, 1))
                     if indent != indent_stack[-1]:
                         raise LexError(
-                            "girinti hizasız: bu satırın girintisi üstteki hiçbir "
-                            "blokla eşleşmiyor",
+                            "inconsistent indentation: this line's indent matches no "
+                            "enclosing block",
                             line_no,
                             indent + 1,
                         )
@@ -97,7 +97,7 @@ class Lexer:
                 tokens.append(Token(TokenType.NEWLINE, "", "", line_no, len(line) + 1))
 
         if depth > 0:
-            raise LexError("kapatılmamış parantez/köşeli parantez", len(lines), 1)
+            raise LexError("unclosed parenthesis/bracket", len(lines), 1)
 
         last_line = len(lines)
         while len(indent_stack) > 1:
@@ -152,12 +152,12 @@ class Lexer:
                     depth += 1
                 elif tt in (TokenType.RPAREN, TokenType.RBRACKET, TokenType.RBRACE):
                     if depth == 0:
-                        raise LexError(f"eşleşmeyen {ch!r}", line_no, col)
+                        raise LexError(f"unmatched {ch!r}", line_no, col)
                     depth -= 1
                 i += 1
                 continue
 
-            raise LexError(f"tanınmayan karakter: {ch!r}", line_no, col)
+            raise LexError(f"unrecognized character: {ch!r}", line_no, col)
 
         return depth
 
@@ -186,7 +186,7 @@ class Lexer:
             ch = line[i]
             if ch == "\\":
                 if i + 1 >= len(line):
-                    raise LexError("satır sonunda yarım kaçış dizisi", line_no, i + 1)
+                    raise LexError("incomplete escape sequence at end of line", line_no, i + 1)
                 esc = line[i + 1]
                 value_chars.append(_ESCAPES.get(esc, esc))
                 i += 2
@@ -195,7 +195,7 @@ class Lexer:
                 return line[start : i + 1], "".join(value_chars), i + 1
             value_chars.append(ch)
             i += 1
-        raise LexError("kapatılmamış string", line_no, start + 1)
+        raise LexError("unclosed string", line_no, start + 1)
 
 
 def _measure_indent(line: str, line_no: int) -> int:
@@ -205,7 +205,7 @@ def _measure_indent(line: str, line_no: int) -> int:
             indent += 1
         elif ch == "\t":
             raise LexError(
-                "girinti için tab kullanılamaz, boşluk kullanın", line_no, indent + 1
+                "tabs cannot be used for indentation, use spaces", line_no, indent + 1
             )
         else:
             break

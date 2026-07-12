@@ -32,7 +32,7 @@ def get_codegen_module(language: str) -> CodegenModule:
     except KeyError:
         supported = ", ".join(sorted(CODEGEN_REGISTRY))
         raise ValueError(
-            f"desteklenmeyen hedef dil: {language!r} (desteklenenler: {supported})"
+            f"unsupported target language: {language!r} (supported: {supported})"
         ) from None
 
 

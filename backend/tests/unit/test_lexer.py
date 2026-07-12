@@ -93,7 +93,7 @@ def test_unterminated_string_rejected():
 
 
 def test_misaligned_indent_rejected():
-    with pytest.raises(LexError, match="girinti"):
+    with pytest.raises(LexError, match="indentation"):
         Lexer("if x:\n    y = 1\n  z = 2", CANONICAL_DICTIONARY).tokenize()
 
 

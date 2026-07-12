@@ -75,11 +75,11 @@ class _Checker:
         for stmt in body:
             if isinstance(stmt, nodes.FunctionDef):
                 if scope.is_defined(stmt.name):
-                    self._error(f"'{stmt.name}' zaten tanımlı", stmt)
+                    self._error(f"'{stmt.name}' is already defined", stmt)
                 self._define_user_name(stmt.name, stmt, scope)
             elif isinstance(stmt, nodes.ClassDef):
                 if scope.is_defined(stmt.name):
-                    self._error(f"'{stmt.name}' zaten tanımlı", stmt)
+                    self._error(f"'{stmt.name}' is already defined", stmt)
                 self._define_user_name(stmt.name, stmt, scope)
             elif isinstance(stmt, nodes.Import):
                 self._define_user_name(stmt.alias or stmt.module.split(".")[0], stmt, scope)
@@ -111,7 +111,7 @@ class _Checker:
             self.check_block(stmt.body, fn_scope, in_function=True, in_loop=False)
         elif isinstance(stmt, nodes.ClassDef):
             if stmt.base is not None and not scope.is_defined(stmt.base):
-                self._error(f"temel sınıf '{stmt.base}' tanımlı değil", stmt)
+                self._error(f"base class '{stmt.base}' is not defined", stmt)
             self._check_class_members(stmt)
             for method in stmt.methods:
                 m_scope = _Scope(scope)
@@ -122,7 +122,7 @@ class _Checker:
                 self.check_block(method.body, m_scope, in_function=True, in_loop=False)
         elif isinstance(stmt, nodes.Return):
             if not in_function:
-                self._error("fonksiyon dışında değer döndürülemez", stmt)
+                self._error("cannot return a value outside a function", stmt)
             if stmt.value is not None:
                 self._check_expr(stmt.value, scope)
         elif isinstance(stmt, nodes.Pass):
@@ -171,7 +171,7 @@ class _Checker:
         elif isinstance(stmt, (nodes.Break, nodes.Continue)):
             if not in_loop:
                 kind = "break" if isinstance(stmt, nodes.Break) else "continue"
-                self._error(f"döngü dışında '{kind}' kullanılamaz", stmt)
+                self._error(f"'{kind}' cannot be used outside a loop", stmt)
         elif isinstance(stmt, nodes.TryExcept):
             self.check_block(stmt.try_body, _Scope(scope), in_function, in_loop)
             for handler in stmt.handlers:
@@ -206,21 +206,21 @@ class _Checker:
         ):
             pass
         else:
-            self._error(f"beklenmeyen ifade türü: {type(stmt).__name__}", stmt)
+            self._error(f"unexpected statement type: {type(stmt).__name__}", stmt)
 
     def _check_params(self, params: list[nodes.Param]) -> None:
         seen: set[str] = set()
         default_seen = False
         for p in params:
             if p.name in seen:
-                self._error(f"'{p.name}' parametresi iki kez tanımlanmış", p)
+                self._error(f"parameter '{p.name}' is defined twice", p)
             seen.add(p.name)
             if p.default is not None:
                 default_seen = True
             elif default_seen:
                 self._error(
-                    f"varsayılan değerli parametreden sonra zorunlu parametre "
-                    f"gelemez ('{p.name}')",
+                    "a required parameter cannot follow one with a default "
+                    f"value ('{p.name}')",
                     p,
                 )
 
@@ -228,18 +228,18 @@ class _Checker:
         seen_fields: set[str] = set()
         for f in cls.fields:
             if f.name in seen_fields:
-                self._error(f"'{f.name}' alanı iki kez tanımlanmış", f)
+                self._error(f"field '{f.name}' is defined twice", f)
             seen_fields.add(f.name)
         seen_methods: set[str] = set()
         for m in cls.methods:
             if m.name in seen_methods:
-                self._error(f"'{m.name}' metodu iki kez tanımlanmış", m)
+                self._error(f"method '{m.name}' is defined twice", m)
             seen_methods.add(m.name)
 
     def _define_user_name(self, name: str, node: nodes.Node, scope: _Scope) -> None:
         if name in self.known_globals:
             self._error(
-                f"'{name}' yerlesik Python kavrami olarak ayrilmis; degisken adi olarak kullanilamaz",
+                f"'{name}' is reserved as a built-in Python concept; it cannot be used as a variable name",
                 node,
             )
             return
@@ -249,7 +249,7 @@ class _Checker:
         if isinstance(expr, nodes.Identifier):
             if not scope.is_defined(expr.name) and expr.name not in self.known_globals:
                 shown = expr.themed_name or expr.name
-                self._error(f"tanımsız isim: '{shown}'", expr)
+                self._error(f"undefined name: '{shown}'", expr)
         elif isinstance(expr, nodes.Literal):
             pass
         elif isinstance(expr, nodes.ListLiteral):
@@ -272,7 +272,7 @@ class _Checker:
             for p in expr.params:
                 if p in self.known_globals:
                     self._error(
-                        f"'{p}' yerlesik Python kavrami olarak ayrilmis; degisken adi olarak kullanilamaz",
+                        f"'{p}' is reserved as a built-in Python concept; it cannot be used as a variable name",
                         expr,
                     )
                 else:

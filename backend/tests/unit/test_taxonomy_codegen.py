@@ -154,7 +154,7 @@ def test_sql_codegen_rejects_mutating_taxonomy_method_in_expression():
     diagnostic = raised.value.diagnostics[0]
     assert diagnostic.stage == "codegen"
     assert "extend" in diagnostic.message
-    assert "satir" in diagnostic.message or "satÄ±r" in diagnostic.message
+    assert "own line" in diagnostic.message
 
 
 def test_taxonomy_dictionary_resolves_themed_tokens_for_pipeline():

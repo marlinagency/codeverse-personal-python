@@ -16,7 +16,7 @@ from codeverse_core.theme_mapping.llm_provider import (
 def test_catalog_translates_return_outside_function(space_dictionary):
     translation = ErrorTranslator().translate(
         ErrorContext(
-            message="fonksiyon dışında değer döndürülemez",
+            message="cannot return a value outside a function",
             line=5,
             col=1,
             stage="semantic",
@@ -34,11 +34,11 @@ def test_catalog_translates_return_outside_function(space_dictionary):
 
 
 def test_provider_translation_is_used_when_available(space_dictionary):
-    provider = _StaticProvider("temali ve kisa hata mesaji")
+    provider = _StaticProvider("themed and short error message")
 
     translation = ErrorTranslator(provider).translate(
         ErrorContext(
-            message="döngü dışında 'break' kullanılamaz",
+            message="'break' cannot be used outside a loop",
             line=3,
             col=1,
             stage="semantic",
@@ -47,7 +47,7 @@ def test_provider_translation_is_used_when_available(space_dictionary):
     )
 
     assert translation.provider_name == "static"
-    assert translation.themed_message == "temali ve kisa hata mesaji"
+    assert translation.themed_message == "themed and short error message"
 
 
 def test_overlong_provider_translation_falls_back_to_catalog(space_dictionary):
@@ -55,7 +55,7 @@ def test_overlong_provider_translation_falls_back_to_catalog(space_dictionary):
 
     translation = ErrorTranslator(provider, max_provider_message_chars=50).translate(
         ErrorContext(
-            message="döngü dışında 'continue' kullanılamaz",
+            message="'continue' cannot be used outside a loop",
             line=3,
             col=1,
             stage="semantic",
@@ -83,7 +83,7 @@ emit 1
 
     diagnostic = raised.value.diagnostics[0]
     assert diagnostic.stage == "semantic"
-    assert diagnostic.message == "fonksiyon dışında değer döndürülemez"
+    assert diagnostic.message == "cannot return a value outside a function"
     assert diagnostic.themed_message is not None
     assert "`emit`" in diagnostic.themed_message
     assert diagnostic.translation_provider == "catalog"
@@ -108,7 +108,7 @@ def test_provider_exception_degrades_to_catalog(space_dictionary):
 
     translation = ErrorTranslator(_BoomProvider("unused")).translate(
         ErrorContext(
-            message="döngü dışında 'break' kullanılamaz",
+            message="'break' cannot be used outside a loop",
             line=3,
             col=1,
             stage="semantic",

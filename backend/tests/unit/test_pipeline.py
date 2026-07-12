@@ -11,12 +11,12 @@ def compile_(body: str, dictionary, language: str = "python"):
 
 
 def test_empty_body_rejected(space_dictionary):
-    with pytest.raises(CompilationError, match="boş"):
+    with pytest.raises(CompilationError, match="empty"):
         compile_("", space_dictionary)
 
 
 def test_comment_only_body_rejected(space_dictionary):
-    with pytest.raises(CompilationError, match="boş"):
+    with pytest.raises(CompilationError, match="empty"):
         compile_("# sadece yorum\n\n", space_dictionary)
 
 

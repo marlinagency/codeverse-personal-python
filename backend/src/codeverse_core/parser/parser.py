@@ -115,7 +115,7 @@ class Parser:
         if tok.type is not ttype:
             got = tok.themed_text or tok.type.name
             raise ParseError(
-                f"{what} bekleniyordu, {got!r} bulundu", tok.line, tok.col
+                f"expected {what}, found {got!r}", tok.line, tok.col
             )
         return self._advance()
 
@@ -127,7 +127,7 @@ class Parser:
         if tok.type in (TokenType.EOF, TokenType.DEDENT):
             return
         raise ParseError(
-            f"satır sonu bekleniyordu, {tok.themed_text!r} bulundu", tok.line, tok.col
+            f"expected end of line, found {tok.themed_text!r}", tok.line, tok.col
         )
 
     # ---------------------------------------------------------- statements
@@ -181,14 +181,14 @@ class Parser:
 
         if t is TokenType.KW_IMPORT:
             self._advance()
-            name = self._expect(TokenType.NAME, "modül adı")
+            name = self._expect(TokenType.NAME, "a module name")
             module = name.resolved_text
             while self._match(TokenType.DOT):
-                part = self._expect(TokenType.NAME, "modül adı")
+                part = self._expect(TokenType.NAME, "a module name")
                 module += "." + part.resolved_text
             alias = None
             if self._match_name("as"):
-                alias = self._expect(TokenType.NAME, "import alias").resolved_text
+                alias = self._expect(TokenType.NAME, "an import alias").resolved_text
             return nodes.Import(pos=_pos_of(tok), module=module, alias=alias)
 
         if self._is_name("from"):
@@ -280,7 +280,7 @@ class Parser:
             assign_tok = self._advance()
             if not isinstance(expr, (nodes.Identifier, nodes.Index, nodes.Attribute)):
                 raise ParseError(
-                    "atamanın sol tarafı bir isim, dizin erişimi veya alan olmalı",
+                    "the left side of an assignment must be a name, index access, or attribute",
                     assign_tok.line,
                     assign_tok.col,
                 )
@@ -291,7 +291,7 @@ class Parser:
 
         if annotation is not None:
             raise ParseError(
-                "tip belirtilen değişkene bir değer atanmalı ('=' eksik)",
+                "a type-annotated variable must be assigned a value ('=' missing)",
                 tok.line,
                 tok.col,
             )
@@ -300,7 +300,7 @@ class Parser:
 
     def _parse_func_def(self, *, async_def: bool = False) -> nodes.FunctionDef:
         kw = self._advance()  # KW_FUNC
-        name = self._expect(TokenType.NAME, "fonksiyon adı")
+        name = self._expect(TokenType.NAME, "a function name")
         self._expect(TokenType.LPAREN, "'('")
         params = self._parse_params()
         self._expect(TokenType.RPAREN, "')'")
@@ -313,7 +313,7 @@ class Parser:
         # simple and unambiguous: type annotation comes before the block colon
         # only in parentheses form. We therefore do not support a separate
         # return-type syntax; SQL codegen infers it. (documented in grammar)
-        body = self._parse_block("fonksiyon gövdesi")
+        body = self._parse_block("the function body")
         return nodes.FunctionDef(
             pos=_pos_of(kw),
             name=name.resolved_text,
@@ -328,7 +328,7 @@ class Parser:
         if self._check(TokenType.RPAREN):
             return params
         while True:
-            name = self._expect(TokenType.NAME, "parametre adı")
+            name = self._expect(TokenType.NAME, "a parameter name")
             type_ref: nodes.TypeRef | None = None
             default: nodes.Node | None = None
             if self._match(TokenType.COLON):
@@ -351,17 +351,17 @@ class Parser:
 
     def _parse_from_import(self) -> nodes.FromImport:
         start = self._advance()  # from
-        module = self._parse_dotted_name("modul adi")
+        module = self._parse_dotted_name("a module name")
         if self._peek().type is not TokenType.KW_IMPORT:
             tok = self._peek()
-            raise ParseError("'import' bekleniyordu", tok.line, tok.col)
+            raise ParseError("expected 'import'", tok.line, tok.col)
         self._advance()
         names: list[tuple[str, str | None]] = []
         while True:
-            name = self._expect(TokenType.NAME, "import adi").resolved_text
+            name = self._expect(TokenType.NAME, "an import name").resolved_text
             alias = None
             if self._match_name("as"):
-                alias = self._expect(TokenType.NAME, "import takma adi").resolved_text
+                alias = self._expect(TokenType.NAME, "an import alias").resolved_text
             names.append((name, alias))
             if not self._match(TokenType.COMMA):
                 break
@@ -374,39 +374,39 @@ class Parser:
             context = self._parse_expr()
             alias = None
             if self._match_name("as"):
-                alias = self._expect(TokenType.NAME, "with takma adi").resolved_text
+                alias = self._expect(TokenType.NAME, "a with alias").resolved_text
             items.append(nodes.WithItem(context=context, alias=alias))
             if not self._match(TokenType.COMMA):
                 break
-        body = self._parse_block("with govdesi")
+        body = self._parse_block("the with body")
         return nodes.With(pos=_pos_of(start), items=items, body=body)
 
     def _parse_match(self) -> nodes.Match:
         start = self._advance()  # match
         subject = self._parse_expr()
         self._expect(TokenType.COLON, "':'")
-        self._expect(TokenType.NEWLINE, "yeni satir")
+        self._expect(TokenType.NEWLINE, "a new line")
         tok = self._peek()
         if tok.type is not TokenType.INDENT:
-            raise ParseError("match icin girintili case bloklari gerekli", tok.line, tok.col)
+            raise ParseError("match requires indented case blocks", tok.line, tok.col)
         self._advance()
         cases: list[nodes.MatchCase] = []
         while not self._check(TokenType.DEDENT, TokenType.EOF):
             case_tok = self._expect_sql_name("case")
             pattern = self._parse_expr()
-            body = self._parse_block("case govdesi")
+            body = self._parse_block("the case body")
             cases.append(nodes.MatchCase(pattern=pattern, body=body))
             if case_tok.type is TokenType.EOF:
                 break
         self._match(TokenType.DEDENT)
         if not cases:
-            raise ParseError("match en az bir case icermeli", start.line, start.col)
+            raise ParseError("match must contain at least one case", start.line, start.col)
         return nodes.Match(pos=_pos_of(start), subject=subject, cases=cases)
 
     def _parse_name_list(self) -> list[str]:
-        names = [self._expect(TokenType.NAME, "isim").resolved_text]
+        names = [self._expect(TokenType.NAME, "a name").resolved_text]
         while self._match(TokenType.COMMA):
-            names.append(self._expect(TokenType.NAME, "isim").resolved_text)
+            names.append(self._expect(TokenType.NAME, "a name").resolved_text)
         return names
 
     def _parse_target_list(self) -> list[nodes.Node]:
@@ -416,19 +416,19 @@ class Parser:
         for target in targets:
             if not isinstance(target, (nodes.Identifier, nodes.Index, nodes.Attribute)):
                 raise ParseError(
-                    "silme hedefi bir isim, dizin erisimi veya alan olmalidir",
+                    "a delete target must be a name, index access, or attribute",
                     target.pos.line,
                     target.pos.col,
                 )
         return targets
 
     def _parse_type_ref(self, anchor: Token) -> nodes.TypeRef:
-        tok = self._expect(TokenType.NAME, "tip adı (int, float, str, bool, list, dict)")
+        tok = self._expect(TokenType.NAME, "a type name (int, float, str, bool, list, dict)")
         name = tok.resolved_text
         if name not in DSL_TYPE_NAMES and not name[0].isupper():
             raise ParseError(
-                f"bilinmeyen tip: {tok.themed_text!r} "
-                "(int, float, str, bool, list, dict veya bir sınıf adı olmalı)",
+                f"unknown type: {tok.themed_text!r} "
+                "(must be int, float, str, bool, list, dict, or a class name)",
                 tok.line,
                 tok.col,
             )
@@ -436,14 +436,14 @@ class Parser:
 
     def _parse_class_def(self) -> nodes.ClassDef:
         kw = self._advance()  # KW_CLASS
-        name = self._expect(TokenType.NAME, "sınıf adı")
+        name = self._expect(TokenType.NAME, "a class name")
         base: str | None = None
         if self._match(TokenType.LPAREN):
-            base_tok = self._expect(TokenType.NAME, "temel sınıf adı")
+            base_tok = self._expect(TokenType.NAME, "a base class name")
             base = base_tok.resolved_text
             self._expect(TokenType.RPAREN, "')'")
 
-        body = self._parse_block("sınıf gövdesi")
+        body = self._parse_block("the class body")
 
         fields: list[nodes.Param] = []
         methods: list[nodes.FunctionDef] = []
@@ -463,8 +463,8 @@ class Parser:
                 )
             else:
                 raise ParseError(
-                    "sınıf gövdesinde yalnızca alan tanımları (isim = değer) ve "
-                    f"{self._themed(UniversalConcept.FUNCTION_DEF)} tanımları olabilir",
+                    "a class body may only contain field definitions (name = value) and "
+                    f"{self._themed(UniversalConcept.FUNCTION_DEF)} definitions",
                     stmt.pos.line,
                     stmt.pos.col,
                 )
@@ -479,18 +479,18 @@ class Parser:
     def _parse_if(self) -> nodes.If:
         kw = self._advance()  # KW_IF
         condition = self._parse_expr()
-        then_body = self._parse_block("koşul gövdesi")
+        then_body = self._parse_block("the condition body")
 
         elif_branches: list[tuple[nodes.Node, list[nodes.Node]]] = []
         while self._check(TokenType.KW_ELIF):
             self._advance()
             cond = self._parse_expr()
-            body = self._parse_block("koşul gövdesi")
+            body = self._parse_block("the condition body")
             elif_branches.append((cond, body))
 
         else_body: list[nodes.Node] | None = None
         if self._match(TokenType.KW_ELSE):
-            else_body = self._parse_block("aksi durum gövdesi")
+            else_body = self._parse_block("the else body")
 
         return nodes.If(
             pos=_pos_of(kw),
@@ -502,18 +502,18 @@ class Parser:
 
     def _parse_for(self) -> nodes.ForLoop:
         kw = self._advance()  # KW_FOR
-        var = self._expect(TokenType.NAME, "döngü değişkeni")
+        var = self._expect(TokenType.NAME, "a loop variable")
         tok = self._peek()
         if tok.type is not TokenType.KW_IN:
             raise ParseError(
-                f"{self._themed(UniversalConcept.IN)} bekleniyordu, "
-                f"{tok.themed_text!r} bulundu",
+                f"expected {self._themed(UniversalConcept.IN)}, "
+                f"found {tok.themed_text!r}",
                 tok.line,
                 tok.col,
             )
         self._advance()
         iterable = self._parse_expr()
-        body = self._parse_block("döngü gövdesi")
+        body = self._parse_block("the loop body")
         return nodes.ForLoop(
             pos=_pos_of(kw), var_name=var.resolved_text, iterable=iterable, body=body
         )
@@ -521,12 +521,12 @@ class Parser:
     def _parse_while(self) -> nodes.WhileLoop:
         kw = self._advance()  # KW_WHILE
         condition = self._parse_expr()
-        body = self._parse_block("döngü gövdesi")
+        body = self._parse_block("the loop body")
         return nodes.WhileLoop(pos=_pos_of(kw), condition=condition, body=body)
 
     def _parse_try(self) -> nodes.TryExcept:
         kw = self._advance()  # KW_TRY
-        try_body = self._parse_block("korumalı blok")
+        try_body = self._parse_block("the try block")
 
         handlers: list[nodes.ExceptHandler] = []
         while self._check(TokenType.KW_EXCEPT):
@@ -534,21 +534,21 @@ class Parser:
             bind_name: str | None = None
             if self._check(TokenType.NAME):
                 bind_name = self._advance().resolved_text
-            body = self._parse_block("hata yakalama gövdesi")
+            body = self._parse_block("the except body")
             handlers.append(
                 nodes.ExceptHandler(pos=_pos_of(h_kw), bind_name=bind_name, body=body)
             )
 
         finally_body: list[nodes.Node] | None = None
         if self._match(TokenType.KW_FINALLY):
-            finally_body = self._parse_block("her durumda çalışan blok")
+            finally_body = self._parse_block("the finally block")
 
         if not handlers and finally_body is None:
             tok = self._peek()
             raise ParseError(
-                f"{self._themed(UniversalConcept.TRY)} bloğundan sonra "
-                f"{self._themed(UniversalConcept.EXCEPT)} veya "
-                f"{self._themed(UniversalConcept.FINALLY)} gerekli",
+                f"{self._themed(UniversalConcept.TRY)} block must be followed by "
+                f"{self._themed(UniversalConcept.EXCEPT)} or "
+                f"{self._themed(UniversalConcept.FINALLY)}",
                 tok.line,
                 tok.col,
             )
@@ -562,11 +562,11 @@ class Parser:
 
     def _parse_block(self, what: str) -> list[nodes.Node]:
         self._expect(TokenType.COLON, "':'")
-        self._expect(TokenType.NEWLINE, "yeni satır")
+        self._expect(TokenType.NEWLINE, "a new line")
         tok = self._peek()
         if tok.type is not TokenType.INDENT:
             raise ParseError(
-                f"{what} için girintili en az bir satır gerekli", tok.line, tok.col
+                f"{what} requires at least one indented line", tok.line, tok.col
             )
         self._advance()
         body: list[nodes.Node] = []
@@ -622,12 +622,12 @@ class Parser:
 
     def _parse_sql_create_table(self) -> nodes.SqlCreateTable:
         start = self._advance()  # create_table
-        table = nodes.SqlTableRef(name=self._parse_dotted_name("tablo adi"))
+        table = nodes.SqlTableRef(name=self._parse_dotted_name("a table name"))
         self._expect(TokenType.LPAREN, "'('")
         columns: list[nodes.SqlColumnDef] = []
         if not self._check(TokenType.RPAREN):
             while True:
-                name = self._expect(TokenType.NAME, "kolon adi")
+                name = self._expect(TokenType.NAME, "a column name")
                 type_ref = self._parse_type_ref(name)
                 constraints, check = self._parse_sql_column_constraints()
                 columns.append(
@@ -645,7 +645,7 @@ class Parser:
         self._expect(TokenType.RPAREN, "')'")
         if not columns:
             raise ParseError(
-                "create_table en az bir kolon tanimi icermeli",
+                "create_table must contain at least one column definition",
                 start.line,
                 start.col,
             )
@@ -668,12 +668,12 @@ class Parser:
 
     def _parse_sql_insert(self) -> nodes.SqlInsert:
         start = self._advance()  # insert_into
-        table = self._parse_dotted_name("tablo adi")
+        table = self._parse_dotted_name("a table name")
         columns: list[str] = []
         if self._match(TokenType.LPAREN):
             if not self._check(TokenType.RPAREN):
                 while True:
-                    columns.append(self._expect(TokenType.NAME, "kolon adi").resolved_text)
+                    columns.append(self._expect(TokenType.NAME, "a column name").resolved_text)
                     if not self._match(TokenType.COMMA):
                         break
                     if self._check(TokenType.RPAREN):
@@ -685,19 +685,19 @@ class Parser:
         self._expect(TokenType.RPAREN, "')'")
         if columns and len(columns) != len(values):
             raise ParseError(
-                "insert_into kolon sayisi ile values deger sayisi esit olmali",
+                "insert_into column count must equal the number of values",
                 start.line,
                 start.col,
             )
         if not values:
-            raise ParseError("insert_into en az bir values degeri icermeli", start.line, start.col)
+            raise ParseError("insert_into must contain at least one value", start.line, start.col)
         return nodes.SqlInsert(
             pos=_pos_of(start), table=table, columns=columns, values=values
         )
 
     def _parse_sql_update(self) -> nodes.SqlUpdate:
         start = self._advance()  # update
-        table = self._parse_dotted_name("tablo adi")
+        table = self._parse_dotted_name("a table name")
         self._expect_sql_name("set")
         assignments = self._parse_sql_assignments()
         where = self._parse_expr() if self._match_name("where") else None
@@ -708,26 +708,26 @@ class Parser:
     def _parse_sql_delete(self) -> nodes.SqlDelete:
         start = self._advance()  # delete
         self._expect_sql_name("from")
-        table = self._parse_dotted_name("tablo adi")
+        table = self._parse_dotted_name("a table name")
         where = self._parse_expr() if self._match_name("where") else None
         return nodes.SqlDelete(pos=_pos_of(start), table=table, where=where)
 
     def _parse_sql_drop_table(self) -> nodes.SqlDropTable:
         start = self._advance()
-        table = self._parse_dotted_name("tablo adi")
+        table = self._parse_dotted_name("a table name")
         return nodes.SqlDropTable(pos=_pos_of(start), table=table)
 
     def _parse_sql_truncate_table(self) -> nodes.SqlTruncateTable:
         start = self._advance()
-        table = self._parse_dotted_name("tablo adi")
+        table = self._parse_dotted_name("a table name")
         return nodes.SqlTruncateTable(pos=_pos_of(start), table=table)
 
     def _parse_sql_alter_table(self) -> nodes.SqlAlterTable:
         start = self._advance()
-        table = self._parse_dotted_name("tablo adi")
+        table = self._parse_dotted_name("a table name")
         if self._match_name("add"):
             self._match_name("column")
-            column = self._expect(TokenType.NAME, "kolon adi")
+            column = self._expect(TokenType.NAME, "a column name")
             type_ref = self._parse_type_ref(column)
             return nodes.SqlAlterTable(
                 pos=_pos_of(start),
@@ -737,7 +737,7 @@ class Parser:
                 type_ref=type_ref,
             )
         if self._match_name("drop_column"):
-            column = self._expect(TokenType.NAME, "kolon adi")
+            column = self._expect(TokenType.NAME, "a column name")
             return nodes.SqlAlterTable(
                 pos=_pos_of(start),
                 table=table,
@@ -745,7 +745,7 @@ class Parser:
                 column=column.resolved_text,
             )
         if self._match_name("alter_column"):
-            column = self._expect(TokenType.NAME, "kolon adi")
+            column = self._expect(TokenType.NAME, "a column name")
             type_ref = self._parse_type_ref(column)
             return nodes.SqlAlterTable(
                 pos=_pos_of(start),
@@ -755,13 +755,13 @@ class Parser:
                 type_ref=type_ref,
             )
         tok = self._peek()
-        raise ParseError("alter_table icin add, drop_column veya alter_column gerekli", tok.line, tok.col)
+        raise ParseError("alter_table requires add, drop_column, or alter_column", tok.line, tok.col)
 
     def _parse_sql_create_index(self, *, unique: bool) -> nodes.SqlCreateIndex:
         start = self._advance()
-        name = self._expect(TokenType.NAME, "index adi").resolved_text
+        name = self._expect(TokenType.NAME, "an index name").resolved_text
         self._expect_sql_name("on")
-        table = self._parse_dotted_name("tablo adi")
+        table = self._parse_dotted_name("a table name")
         self._expect(TokenType.LPAREN, "'('")
         columns = self._parse_sql_name_items()
         self._expect(TokenType.RPAREN, "')'")
@@ -771,29 +771,29 @@ class Parser:
 
     def _parse_sql_drop_index(self) -> nodes.SqlDropIndex:
         start = self._advance()
-        name = self._expect(TokenType.NAME, "index adi").resolved_text
+        name = self._expect(TokenType.NAME, "an index name").resolved_text
         return nodes.SqlDropIndex(pos=_pos_of(start), name=name)
 
     def _parse_sql_create_view(self) -> nodes.SqlCreateView:
         start = self._advance()
-        name = self._expect(TokenType.NAME, "view adi").resolved_text
+        name = self._expect(TokenType.NAME, "a view name").resolved_text
         self._expect_sql_name("as")
         query = self._parse_sql_select()
         return nodes.SqlCreateView(pos=_pos_of(start), name=name, query=query)
 
     def _parse_sql_drop_view(self) -> nodes.SqlDropView:
         start = self._advance()
-        name = self._expect(TokenType.NAME, "view adi").resolved_text
+        name = self._expect(TokenType.NAME, "a view name").resolved_text
         return nodes.SqlDropView(pos=_pos_of(start), name=name)
 
     def _parse_sql_create_database(self) -> nodes.SqlCreateDatabase:
         start = self._advance()
-        name = self._expect(TokenType.NAME, "database adi").resolved_text
+        name = self._expect(TokenType.NAME, "a database name").resolved_text
         return nodes.SqlCreateDatabase(pos=_pos_of(start), name=name)
 
     def _parse_sql_drop_database(self) -> nodes.SqlDropDatabase:
         start = self._advance()
-        name = self._expect(TokenType.NAME, "database adi").resolved_text
+        name = self._expect(TokenType.NAME, "a database name").resolved_text
         return nodes.SqlDropDatabase(pos=_pos_of(start), name=name)
 
     def _parse_sql_select_items(self) -> list[nodes.SqlSelectItem]:
@@ -802,7 +802,7 @@ class Parser:
             expr = self._parse_expr()
             alias = None
             if self._match_name("as"):
-                alias = self._expect(TokenType.NAME, "sorgu alan takma adi").resolved_text
+                alias = self._expect(TokenType.NAME, "a query field alias").resolved_text
             items.append(nodes.SqlSelectItem(expr=expr, alias=alias))
             if not self._match(TokenType.COMMA):
                 return items
@@ -816,7 +816,7 @@ class Parser:
     def _parse_sql_assignments(self) -> list[nodes.SqlAssignment]:
         assignments: list[nodes.SqlAssignment] = []
         while True:
-            name = self._expect(TokenType.NAME, "kolon adi")
+            name = self._expect(TokenType.NAME, "a column name")
             self._expect(TokenType.ASSIGN, "'='")
             value = self._parse_expr()
             assignments.append(nodes.SqlAssignment(name=name.resolved_text, value=value))
@@ -824,9 +824,9 @@ class Parser:
                 return assignments
 
     def _parse_sql_name_items(self) -> list[str]:
-        items = [self._expect(TokenType.NAME, "kolon adi").resolved_text]
+        items = [self._expect(TokenType.NAME, "a column name").resolved_text]
         while self._match(TokenType.COMMA):
-            items.append(self._expect(TokenType.NAME, "kolon adi").resolved_text)
+            items.append(self._expect(TokenType.NAME, "a column name").resolved_text)
         return items
 
     def _parse_sql_order_items(self) -> list[nodes.SqlOrderItem]:
@@ -841,10 +841,10 @@ class Parser:
                 return items
 
     def _parse_sql_table_ref(self) -> nodes.SqlTableRef:
-        name = self._parse_dotted_name("tablo adi")
+        name = self._parse_dotted_name("a table name")
         alias = None
         if self._match_name("as"):
-            alias = self._expect(TokenType.NAME, "tablo takma adi").resolved_text
+            alias = self._expect(TokenType.NAME, "a table alias").resolved_text
         elif (
             self._check(TokenType.NAME)
             and self._peek().resolved_text not in _SQL_CLAUSE_NAMES
@@ -866,7 +866,7 @@ class Parser:
         if tok.type is TokenType.NAME and tok.resolved_text == name:
             return self._advance()
         got = tok.themed_text or tok.type.name
-        raise ParseError(f"'{name}' bekleniyordu, {got!r} bulundu", tok.line, tok.col)
+        raise ParseError(f"expected '{name}', found {got!r}", tok.line, tok.col)
 
     # --------------------------------------------------------- expressions
 
@@ -879,7 +879,7 @@ class Parser:
             op = self._advance()
             if not isinstance(left, nodes.Identifier):
                 raise ParseError(
-                    "walrus operatorunun sol tarafi bir isim olmalidir",
+                    "the left side of the walrus operator must be a name",
                     op.line,
                     op.col,
                 )
@@ -895,8 +895,8 @@ class Parser:
             if not self._check(TokenType.KW_ELSE):
                 tok = self._peek()
                 raise ParseError(
-                    f"{self._themed(UniversalConcept.ELSE)} bekleniyordu, "
-                    f"{tok.themed_text!r} bulundu",
+                    f"expected {self._themed(UniversalConcept.ELSE)}, "
+                    f"found {tok.themed_text!r}",
                     tok.line,
                     tok.col,
                 )
@@ -961,7 +961,7 @@ class Parser:
                 lower = self._parse_arith()
                 if not (self._check(TokenType.KW_AND) or self._is_name("and")):
                     tok = self._peek()
-                    raise ParseError("'and' bekleniyordu", tok.line, tok.col)
+                    raise ParseError("expected 'and'", tok.line, tok.col)
                 self._advance()
                 upper = self._parse_arith()
                 left = nodes.BetweenOp(
@@ -1051,7 +1051,7 @@ class Parser:
                 expr = nodes.Index(pos=expr.pos, target=expr, key=key)
             elif self._check(TokenType.DOT):
                 self._advance()
-                name_tok = self._expect(TokenType.NAME, "alan/metot adı")
+                name_tok = self._expect(TokenType.NAME, "a field/method name")
                 if self._check(TokenType.LPAREN):
                     self._advance()
                     args = self._parse_args()
@@ -1090,7 +1090,7 @@ class Parser:
         params: list[str] = []
         if not self._check(TokenType.COLON):
             while True:
-                params.append(self._expect(TokenType.NAME, "lambda parametresi").resolved_text)
+                params.append(self._expect(TokenType.NAME, "a lambda parameter").resolved_text)
                 if not self._match(TokenType.COMMA):
                     break
         self._expect(TokenType.COLON, "':'")
@@ -1196,7 +1196,7 @@ class Parser:
             return expr
 
         got = tok.themed_text or tok.type.name
-        raise ParseError(f"ifade bekleniyordu, {got!r} bulundu", tok.line, tok.col)
+        raise ParseError(f"expected an expression, found {got!r}", tok.line, tok.col)
 
 
 def _pos_of(tok: Token) -> nodes.Position:

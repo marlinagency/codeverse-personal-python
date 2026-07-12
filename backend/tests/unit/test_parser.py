@@ -123,7 +123,7 @@ def test_themed_error_message_uses_themed_keyword(space_dictionary):
 
 
 def test_missing_block_rejected():
-    with pytest.raises(ParseError, match="girintili"):
+    with pytest.raises(ParseError, match="indented"):
         parse("if x > 1:\ny = 2")
 
 
@@ -134,7 +134,7 @@ def test_annotation_assignment():
 
 
 def test_assignment_to_literal_rejected():
-    with pytest.raises(ParseError, match="sol taraf"):
+    with pytest.raises(ParseError, match="left side"):
         parse("5 = x")
 
 

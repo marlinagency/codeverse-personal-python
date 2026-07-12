@@ -120,8 +120,8 @@ class SqlEmitter:
         if ext is None:
             allowed = ", ".join(sorted(dialect.EXTENSION_WHITELIST))
             raise CodegenError(
-                f"SQL hedefinde yalnızca şu modüller içe aktarılabilir: {allowed} "
-                f"('{imp.module}' desteklenmiyor)",
+                f"only these modules can be imported in the SQL target: {allowed} "
+                f"('{imp.module}' is not supported)",
                 imp,
             )
         return f'CREATE EXTENSION IF NOT EXISTS "{ext}";\n'
@@ -131,8 +131,8 @@ class SqlEmitter:
     def _register_class(self, cls: nodes.ClassDef) -> None:
         if cls.base is not None:
             raise CodegenError(
-                "SQL hedefinde sınıf kalıtımı desteklenmiyor (composite tipler "
-                "kalıtım almaz) — kalıtımsız bir sınıf kullanın",
+                "class inheritance is not supported in the SQL target (composite types "
+                "do not inherit) — use a class without a base",
                 cls,
             )
         info = _ClassInfo(name=cls.name)
@@ -145,8 +145,8 @@ class SqlEmitter:
                     sql_type = JSONB
             else:
                 raise CodegenError(
-                    f"SQL hedefinde sınıf alanı '{f.name}' için tip veya "
-                    "varsayılan değer zorunlu",
+                    f"class field '{f.name}' requires a type or a "
+                    "default value in the SQL target",
                     f,
                 )
             info.fields[f.name] = (sql_type, f.default)
@@ -179,9 +179,9 @@ class SqlEmitter:
                 t = NUMERIC
                 self.warnings.append(
                     CodegenWarning(
-                        f"'{fn.name}' fonksiyonunun '{p.name}' parametresi için tip "
-                        "belirtilmedi; 'numeric' varsayıldı (p: int gibi bir tip "
-                        "ekleyebilirsiniz)",
+                        f"parameter '{p.name}' of function '{fn.name}' has no type "
+                        "annotation; assumed 'numeric' (you can add a type like p: int"
+                        ")",
                         p.pos.line,
                         p.pos.col,
                     )
@@ -229,7 +229,7 @@ class SqlEmitter:
 
     def _emit_function(self, fn: nodes.FunctionDef, self_class: str | None = None) -> str:
         if fn.async_def:
-            raise CodegenError("async fonksiyonlar SQL hedefinde desteklenmiyor", fn)
+            raise CodegenError("async functions are not supported in the SQL target", fn)
         sig = (
             self._classes[self_class].methods[fn.name]
             if self_class
@@ -328,13 +328,13 @@ class SqlEmitter:
         for stmt in body:
             if isinstance(stmt, nodes.FunctionDef):
                 raise CodegenError(
-                    "SQL hedefinde iç içe fonksiyon tanımlanamaz — fonksiyonları "
-                    "en üst düzeyde tanımlayın",
+                    "nested functions cannot be defined in the SQL target — define functions "
+                    "at the top level",
                     stmt,
                 )
             if isinstance(stmt, nodes.ClassDef):
                 raise CodegenError(
-                    "SQL hedefinde sınıflar yalnızca en üst düzeyde tanımlanabilir",
+                    "classes can only be defined at the top level in the SQL target",
                     stmt,
                 )
             if isinstance(stmt, nodes.Assignment) and isinstance(
@@ -443,7 +443,7 @@ class SqlEmitter:
 
         if isinstance(stmt, (nodes.Global, nodes.Nonlocal)):
             raise CodegenError(
-                "global/nonlocal yalnizca Python hedefinde desteklenir",
+                "global/nonlocal is only supported by the Python target",
                 stmt,
             )
 
@@ -472,7 +472,7 @@ class SqlEmitter:
 
         if isinstance(stmt, (nodes.FromImport, nodes.With, nodes.Match)):
             raise CodegenError(
-                f"SQL hedefinde bu Python yapisi desteklenmiyor: {type(stmt).__name__}",
+                f"this Python construct is not supported in the SQL target: {type(stmt).__name__}",
                 stmt,
             )
 
@@ -484,12 +484,12 @@ class SqlEmitter:
             _TOP_LEVEL_SQL_STMTS,
         ):
             raise CodegenError(
-                "SQL DDL/DML cumleleri yalnizca en ust seviyede desteklenir",
+                "SQL DDL/DML statements are only supported at the top level",
                 stmt,
             )
 
         raise CodegenError(
-            f"SQL üretici bu yapıyı desteklemiyor: {type(stmt).__name__}", stmt
+            f"the SQL generator does not support this construct: {type(stmt).__name__}", stmt
         )
 
     def _emit_assignment(
@@ -504,8 +504,8 @@ class SqlEmitter:
             base = stmt.target.target
             if not isinstance(base, nodes.Identifier):
                 raise CodegenError(
-                    "SQL hedefinde iç içe dizin ataması desteklenmiyor "
-                    "(önce ara değeri bir değişkene alın)",
+                    "nested index assignment is not supported in the SQL target "
+                    "(assign the intermediate value to a variable first)",
                     stmt,
                 )
             key_sql = self._to_jsonb(stmt.target.key, scope)
@@ -518,7 +518,7 @@ class SqlEmitter:
             val_sql = self._coerce(stmt.value, field_type, scope)
             return [f"{pad}{base_sql}.{stmt.target.name} := {val_sql};"]
 
-        raise CodegenError("geçersiz atama hedefi", stmt)
+        raise CodegenError("invalid assignment target", stmt)
 
     def _emit_delete(
         self, stmt: nodes.Delete, scope: dict[str, str], pad: str
@@ -538,7 +538,7 @@ class SqlEmitter:
                 base_sql = self._expr(target.target, scope)
                 lines.append(f"{pad}{base_sql}.{target.name} := NULL;")
             else:
-                raise CodegenError("SQL hedefinde bu silme hedefi desteklenmiyor", target)
+                raise CodegenError("this delete target is not supported in the SQL target", target)
         return lines
 
     def _emit_expr_statement(
@@ -555,8 +555,8 @@ class SqlEmitter:
                 base = expr.target
                 if not isinstance(base, nodes.Identifier):
                     raise CodegenError(
-                        "SQL hedefinde koleksiyon işlemleri yalnızca değişkenler "
-                        "üzerinde yapılabilir",
+                        "collection operations in the SQL target can only be performed "
+                        "on variables",
                         expr,
                     )
                 self._expect_method_arity(
@@ -576,14 +576,14 @@ class SqlEmitter:
                 base = expr.target
                 if not isinstance(base, nodes.Identifier):
                     raise CodegenError(
-                        "SQL hedefinde koleksiyon islemleri yalnizca degiskenler "
-                        "uzerinde yapilabilir",
+                        "collection operations in the SQL target can only be performed "
+                        "on variables",
                         expr,
                     )
                 if self._infer(base, scope) not in (JSONB, UNKNOWN):
                     shown = expr.themed_method or method
                     raise CodegenError(
-                        f"'{shown}' yalnizca list/dict degerlerde kullanilabilir",
+                        f"'{shown}' can only be used on list/dict values",
                         expr,
                     )
                 spec = taxonomy.JSONB_STATEMENT_METHODS[method]
@@ -623,7 +623,7 @@ class SqlEmitter:
                 start_sql = self._coerce_int(args[0], scope)
                 end_sql = self._coerce_int(args[1], scope)
             else:
-                raise CodegenError("range 1 veya 2 argüman alır", stmt.iterable)
+                raise CodegenError("range takes 1 or 2 arguments", stmt.iterable)
             lines = [
                 f"{pad}FOR {stmt.var_name} IN {start_sql}..({end_sql}) - 1 LOOP"
             ]
@@ -646,7 +646,7 @@ class SqlEmitter:
     ) -> list[str]:
         if len(stmt.handlers) > 1:
             raise CodegenError(
-                "birden fazla hata yakalama bloğu desteklenmiyor — tek blok kullanın",
+                "multiple except blocks are not supported — use a single block",
                 stmt.handlers[1],
             )
         pad = "  " * indent
@@ -686,10 +686,10 @@ class SqlEmitter:
             return f"(-{self._coerce(expr.operand, NUMERIC, scope)})"
 
         if isinstance(expr, nodes.AssignmentExpr):
-            raise CodegenError("walrus ifadeleri SQL hedefinde desteklenmiyor", expr)
+            raise CodegenError("walrus expressions are not supported in the SQL target", expr)
 
         if isinstance(expr, nodes.LambdaExpr):
-            raise CodegenError("lambda ifadeleri SQL hedefinde desteklenmiyor", expr)
+            raise CodegenError("lambda expressions are not supported in the SQL target", expr)
 
         if isinstance(expr, nodes.ConditionalExpr):
             return (
@@ -724,7 +724,7 @@ class SqlEmitter:
             return f"({base_sql}).{expr.name}"
 
         raise CodegenError(
-            f"SQL üretici bu ifadeyi desteklemiyor: {type(expr).__name__}", expr
+            f"the SQL generator does not support this expression: {type(expr).__name__}", expr
         )
 
     def _literal(self, lit: nodes.Literal) -> str:
@@ -800,7 +800,7 @@ class SqlEmitter:
             right = self._coerce(expr.right, NUMERIC, scope)
             return f"({left} {op} {right})"
 
-        raise CodegenError(f"SQL üretici '{op}' işlecini desteklemiyor", expr)
+        raise CodegenError(f"the SQL generator does not support the '{op}' operator", expr)
 
     def _equality(self, expr: nodes.BinaryOp, scope: dict[str, str]) -> str:
         sql_op = "=" if expr.op == "==" else "<>"
@@ -833,22 +833,22 @@ class SqlEmitter:
         name = _callee_name(expr)
         if name is None:
             raise CodegenError(
-                "SQL hedefinde yalnızca isimle çağrı yapılabilir", expr
+                "only named calls are allowed in the SQL target", expr
             )
 
         if name == "print":
             raise CodegenError(
-                "çıktı yazdırma bir ifade değildir; kendi başına bir satır olarak "
-                "kullanın",
+                "printing output is not an expression; use it on its "
+                "own line",
                 expr,
             )
         if name == "range":
             raise CodegenError(
-                "range yalnızca döngü başlığında kullanılabilir", expr
+                "range can only be used in a loop header", expr
             )
         if name == "len":
             if len(expr.args) != 1:
-                raise CodegenError("len tam olarak 1 argüman alır", expr)
+                raise CodegenError("len takes exactly 1 argument", expr)
             arg = expr.args[0]
             t = self._infer(arg, scope)
             if t == TEXT:
@@ -865,7 +865,7 @@ class SqlEmitter:
         # user function
         sig = self._functions.get(name)
         if sig is None:
-            raise CodegenError(f"tanımsız fonksiyon: '{name}'", expr)
+            raise CodegenError(f"undefined function: '{name}'", expr)
         self._expect_call_arity(
             expr,
             name,
@@ -883,8 +883,8 @@ class SqlEmitter:
         field_items = list(info.fields.items())
         if len(expr.args) > len(field_items):
             raise CodegenError(
-                f"'{class_name}' {len(field_items)} alan alır, "
-                f"{len(expr.args)} argüman verildi",
+                f"'{class_name}' takes {len(field_items)} fields, "
+                f"{len(expr.args)} given",
                 expr,
             )
         values: list[str] = []
@@ -924,7 +924,7 @@ class SqlEmitter:
             )
             shown = expr.themed_method or method
             raise CodegenError(
-                f"'{shown}' yalnızca kendi başına bir satır olarak kullanılabilir",
+                f"'{shown}' can only be used as a statement on its own line",
                 expr,
             )
 
@@ -935,7 +935,7 @@ class SqlEmitter:
         if method in taxonomy.JSONB_STATEMENT_METHODS:
             shown = expr.themed_method or method
             raise CodegenError(
-                f"'{shown}' yalnizca kendi basina bir satir olarak kullanilabilir",
+                f"'{shown}' can only be used as a statement on its own line",
                 expr,
             )
 
@@ -945,7 +945,7 @@ class SqlEmitter:
             sig = info.methods.get(method)
             if sig is None:
                 raise CodegenError(
-                    f"'{target_type}' sınıfında '{method}' metodu yok", expr
+                    f"class '{target_type}' has no method '{method}'", expr
                 )
             self._expect_call_arity(
                 expr,
@@ -961,8 +961,8 @@ class SqlEmitter:
 
         shown = expr.themed_method or method
         raise CodegenError(
-            f"'{shown}' metodu bu değer üzerinde kullanılamaz "
-            f"(değerin türü: {target_type})",
+            f"method '{shown}' cannot be used on this value "
+            f"(value type: {target_type})",
             expr,
         )
 
@@ -993,7 +993,7 @@ class SqlEmitter:
             return f"DROP INDEX {stmt.name}"
         if isinstance(stmt, nodes.SqlCreateView):
             if stmt.query is None:
-                raise CodegenError("CREATE VIEW icin SELECT sorgusu gerekli", stmt)
+                raise CodegenError("CREATE VIEW requires a SELECT query", stmt)
             return f"CREATE VIEW {stmt.name} AS\n{self._emit_select(stmt.query)}"
         if isinstance(stmt, nodes.SqlDropView):
             return f"DROP VIEW {stmt.name}"
@@ -1002,13 +1002,13 @@ class SqlEmitter:
         if isinstance(stmt, nodes.SqlDropDatabase):
             return f"DROP DATABASE {stmt.name}"
         raise CodegenError(
-            f"SQL uretici bu top-level yapiyi desteklemiyor: {type(stmt).__name__}",
+            f"the SQL generator does not support this top-level construct: {type(stmt).__name__}",
             stmt,
         )
 
     def _emit_create_table(self, stmt: nodes.SqlCreateTable) -> str:
         if stmt.table is None:
-            raise CodegenError("CREATE TABLE icin tablo adi gerekli", stmt)
+            raise CodegenError("CREATE TABLE requires a table name", stmt)
         cols = ",\n  ".join(self._emit_column_def(col, stmt) for col in stmt.columns)
         return f"CREATE TABLE {stmt.table.name} (\n  {cols}\n)"
 
@@ -1022,7 +1022,7 @@ class SqlEmitter:
             elif constraint == "primary_key":
                 parts.append("PRIMARY KEY")
             else:
-                raise CodegenError(f"bilinmeyen kolon constraint'i: {constraint}", stmt)
+                raise CodegenError(f"unknown column constraint: {constraint}", stmt)
         if col.check is not None:
             parts.append(f"CHECK {self._query_expr(col.check)}")
         return " ".join(parts)
@@ -1050,7 +1050,7 @@ class SqlEmitter:
     def _emit_alter_table(self, stmt: nodes.SqlAlterTable) -> str:
         if stmt.action == "add_column":
             if stmt.type_ref is None:
-                raise CodegenError("ADD COLUMN icin tip gerekli", stmt)
+                raise CodegenError("ADD COLUMN requires a type", stmt)
             return (
                 f"ALTER TABLE {stmt.table} ADD COLUMN {stmt.column} "
                 f"{self._sql_type(stmt.type_ref, stmt)}"
@@ -1059,16 +1059,16 @@ class SqlEmitter:
             return f"ALTER TABLE {stmt.table} DROP COLUMN {stmt.column}"
         if stmt.action == "alter_column":
             if stmt.type_ref is None:
-                raise CodegenError("ALTER COLUMN icin tip gerekli", stmt)
+                raise CodegenError("ALTER COLUMN requires a type", stmt)
             return (
                 f"ALTER TABLE {stmt.table} ALTER COLUMN {stmt.column} TYPE "
                 f"{self._sql_type(stmt.type_ref, stmt)}"
             )
-        raise CodegenError(f"bilinmeyen ALTER TABLE islemi: {stmt.action}", stmt)
+        raise CodegenError(f"unknown ALTER TABLE operation: {stmt.action}", stmt)
 
     def _emit_select(self, stmt: nodes.SqlSelect) -> str:
         if stmt.table is None:
-            raise CodegenError("SELECT sorgusu icin FROM gerekli", stmt)
+            raise CodegenError("SELECT query requires FROM", stmt)
         select_prefix = "SELECT DISTINCT" if stmt.distinct else "SELECT"
         lines = [
             f"{select_prefix} "
@@ -1198,7 +1198,7 @@ class SqlEmitter:
                 return spec.render(name, args)
             return f"{name}({', '.join(args)})"
         raise CodegenError(
-            f"SQL sorgusunda bu ifade desteklenmiyor: {type(expr).__name__}", expr
+            f"this expression is not supported in a SQL query: {type(expr).__name__}", expr
         )
 
     def _emit_taxonomy_function(
@@ -1251,7 +1251,7 @@ class SqlEmitter:
             else f"{required}-{total}"
         )
         raise CodegenError(
-            f"'{name}' {expected} arguman alir, {actual} verildi",
+            f"'{name}' takes {expected} arguments, {actual} given",
             expr,
         )
 
@@ -1268,7 +1268,7 @@ class SqlEmitter:
             return
         expected = str(total) if required == total else f"{required}-{total}"
         raise CodegenError(
-            f"'{name}' {expected} argüman alır, {actual} verildi",
+            f"'{name}' takes {expected} arguments, {actual} given",
             expr,
         )
 
@@ -1278,7 +1278,7 @@ class SqlEmitter:
             return
         shown = expr.themed_method or expr.method
         raise CodegenError(
-            f"'{shown}' {expected} argüman alır, {actual} verildi",
+            f"'{shown}' takes {expected} arguments, {actual} given",
             expr,
         )
 
@@ -1407,7 +1407,7 @@ class SqlEmitter:
             f = self._classes[target_type].fields.get(expr.name)
             if f is None:
                 raise CodegenError(
-                    f"'{target_type}' sınıfında '{expr.name}' alanı yok", expr
+                    f"class '{target_type}' has no field '{expr.name}'", expr
                 )
             return f[0]
         return UNKNOWN
@@ -1417,7 +1417,7 @@ class SqlEmitter:
             return dialect.TYPE_MAP[type_ref.name]
         if type_ref.name in self._classes:
             return type_ref.name
-        raise CodegenError(f"SQL hedefinde bilinmeyen tip: '{type_ref.name}'", node)
+        raise CodegenError(f"unknown type in the SQL target: '{type_ref.name}'", node)
 
     # --------------------------------------------------------------- casts
 
@@ -1447,8 +1447,8 @@ class SqlEmitter:
             if actual == BOOL:
                 return sql
             raise CodegenError(
-                "koşul ifadesi mantıksal (boolean) olmalı — açık bir karşılaştırma "
-                "kullanın (ör. x > 0)",
+                "a condition expression must be boolean — use an explicit comparison "
+                "(e.g. x > 0)",
                 expr,
             )
         if target in self._classes:

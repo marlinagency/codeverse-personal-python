@@ -12,21 +12,21 @@ def infer_error_concepts(message: str, stage: str) -> tuple[UniversalConcept, ..
     folded = message.casefold()
     concepts: list[UniversalConcept] = []
 
-    if "fonksiyon" in folded or "function" in folded:
+    if "function" in folded:
         concepts.append(UniversalConcept.FUNCTION_DEF)
-    if "return" in folded or "deger dondur" in _ascii_fold(folded):
+    if "return" in folded:
         concepts.append(UniversalConcept.RETURN)
     if "break" in folded:
         concepts.append(UniversalConcept.BREAK)
     if "continue" in folded:
         concepts.append(UniversalConcept.CONTINUE)
-    if "dongu" in _ascii_fold(folded) or "loop" in folded:
+    if "loop" in folded:
         concepts.extend([UniversalConcept.FOR, UniversalConcept.WHILE])
-    if "if" in folded or "kosul" in _ascii_fold(folded):
+    if "condition" in folded or re.search(r"\bif\b", folded):
         concepts.append(UniversalConcept.IF)
-    if "try" in folded or "except" in folded or "hata yakala" in folded:
+    if "except" in folded or re.search(r"\btry\b", folded):
         concepts.extend([UniversalConcept.TRY, UniversalConcept.EXCEPT])
-    if "undefined" in folded or "tanimsiz" in _ascii_fold(folded):
+    if "undefined" in folded or "not defined" in folded:
         concepts.append(UniversalConcept.IMPORT)
     if stage == "lex":
         concepts.extend([UniversalConcept.FUNCTION_DEF, UniversalConcept.IF])
@@ -44,60 +44,39 @@ def render_catalog_message(
     """Deterministic theme-aware fallback when no LLM is available."""
 
     tags = concepts if concepts is not None else infer_error_concepts(message, stage)
-    folded = _ascii_fold(message.casefold())
+    folded = message.casefold()
 
-    if "fonksiyon disinda deger dondurulemez" in folded:
+    if "cannot return a value outside a function" in folded:
         return (
-            f"`{dictionary.token_for(UniversalConcept.RETURN)}` sadece "
-            f"`{dictionary.token_for(UniversalConcept.FUNCTION_DEF)}` blogunun "
-            "icinde kullanilabilir."
+            f"`{dictionary.token_for(UniversalConcept.RETURN)}` can only be used "
+            f"inside a `{dictionary.token_for(UniversalConcept.FUNCTION_DEF)}` block."
         )
 
-    if "dongu disinda 'break' kullanilamaz" in folded:
+    if "'break' cannot be used outside a loop" in folded:
         return (
-            f"`{dictionary.token_for(UniversalConcept.BREAK)}` yalnizca "
-            f"`{dictionary.token_for(UniversalConcept.FOR)}` veya "
-            f"`{dictionary.token_for(UniversalConcept.WHILE)}` dongusunun "
-            "icinde kullanilabilir."
+            f"`{dictionary.token_for(UniversalConcept.BREAK)}` can only be used "
+            f"inside a `{dictionary.token_for(UniversalConcept.FOR)}` or "
+            f"`{dictionary.token_for(UniversalConcept.WHILE)}` loop."
         )
 
-    if "dongu disinda 'continue' kullanilamaz" in folded:
+    if "'continue' cannot be used outside a loop" in folded:
         return (
-            f"`{dictionary.token_for(UniversalConcept.CONTINUE)}` yalnizca "
-            f"`{dictionary.token_for(UniversalConcept.FOR)}` veya "
-            f"`{dictionary.token_for(UniversalConcept.WHILE)}` dongusunun "
-            "icinde kullanilabilir."
+            f"`{dictionary.token_for(UniversalConcept.CONTINUE)}` can only be used "
+            f"inside a `{dictionary.token_for(UniversalConcept.FOR)}` or "
+            f"`{dictionary.token_for(UniversalConcept.WHILE)}` loop."
         )
 
-    undefined = re.search(r"tan.msz isim: '([^']+)'", folded)
+    undefined = re.search(r"undefined name: '([^']+)'", message)
     if undefined:
         return (
-            f"`{undefined.group(1)}` bu akista henuz tanimli degil. Once deger "
-            "ata, import et veya temali kelime sozlugunu kontrol et."
+            f"`{undefined.group(1)}` is not defined yet in this flow. Assign it a "
+            "value first, import it, or check your themed vocabulary."
         )
 
     if tags:
         themed = ", ".join(f"`{dictionary.token_for(c)}`" for c in tags)
-        return f"{dictionary.theme} sozlugunde {themed} etrafinda hata: {message}"
+        return (
+            f"Error around {themed} in the {dictionary.theme} vocabulary: {message}"
+        )
 
-    return f"{dictionary.theme} sozlugunde hata: {message}"
-
-
-def _ascii_fold(value: str) -> str:
-    table = str.maketrans(
-        {
-            "ç": "c",
-            "ğ": "g",
-            "ı": "i",
-            "ö": "o",
-            "ş": "s",
-            "ü": "u",
-            "Ç": "c",
-            "Ğ": "g",
-            "İ": "i",
-            "Ö": "o",
-            "Ş": "s",
-            "Ü": "u",
-        }
-    )
-    return value.translate(table)
+    return f"Error in the {dictionary.theme} vocabulary: {message}"
