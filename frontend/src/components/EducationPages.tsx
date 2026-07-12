@@ -25,6 +25,7 @@ import {
   checkBridge,
   checkPracticeAnswer,
   compileSource,
+  executeSource,
   getBridgeChallenge,
   getLearningLesson,
   getLearningAssessment,
@@ -41,6 +42,7 @@ import type {
   AssessmentResult,
   BridgeChallenge,
   BridgeCheckResult,
+  ExecutionRunResult,
   LearningModule,
   LearningEvidence,
   LearningPath,
@@ -117,7 +119,6 @@ function ProductHeader({ onNavigate, active = 'learn' }: { onNavigate: (view: Ed
       <nav aria-label="Primary navigation">
         <button className={active === 'learn' ? 'active' : ''} onClick={() => onNavigate('learn')}>Learn</button>
         <button className={active === 'dictionary' ? 'active' : ''} onClick={() => onNavigate('dictionary')}>Dictionary</button>
-        <button className={active === 'playground' ? 'active' : ''} onClick={() => onNavigate('playground')}>Playground</button>
       </nav>
       <button className="edu-avatar" title="Profile">A</button>
     </header>
@@ -335,7 +336,7 @@ function LessonPage({ path, lesson, progress, onSelectModule, onStartPractice, o
                 <ul>{section.key_points.map((point) => <li key={point}>{point}</li>)}</ul>
                 <div className="edu-section-code"><div><small>Personal Python</small><pre>{section.personal_example}</pre></div><div><small>Real Python</small><pre>{section.real_python_example}</pre></div></div>
                 <div className="edu-section-output"><small>Expected output</small><pre>{section.expected_output}</pre></div>
-              </article>)}</div> : lesson.lesson_steps.map((step, index) => <div key={step}><span>{index + 1}</span><p>{step}</p></div>)}
+              </article>)}</div> : <div className="edu-lesson-steps">{lesson.lesson_steps.map((step, index) => <div key={step}><span>{index + 1}</span><p>{step}</p></div>)}</div>}
               <h3>Common misconceptions</h3>{lesson.misconception_checks.map((item) => <p className="misconception" key={item}><X />{item}</p>)}
             </div>}
             {tab === 'try' && <div className="edu-practice-preview"><h3>{lesson.practice_tasks.length} backend-checked exercises</h3>{lesson.practice_tasks.map((task) => <div key={task.id}><span>{task.kind.replace('_', ' ')}</span><p>{task.prompt}</p></div>)}<button onClick={onStartPractice}><Play /> Start practice</button></div>}
@@ -532,6 +533,12 @@ function DictionaryPage({ theme, token, onNavigate, onThemeRegenerated }: { them
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [upgrading, setUpgrading] = useState(false);
+  const [trySource, setTrySource] = useState(() => {
+    const printToken = theme.mappings.py_fn_print || 'print';
+    return `@theme: ${theme.theme_name}\n@language: python\n@version: 1\n---\n${printToken}("Hello from ${theme.theme_name}!")`;
+  });
+  const [tryResult, setTryResult] = useState<Partial<ExecutionRunResult> | null>(null);
+  const [tryRunning, setTryRunning] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -575,6 +582,22 @@ function DictionaryPage({ theme, token, onNavigate, onThemeRegenerated }: { them
     }
   };
 
+  const runTry = async () => {
+    if (!trySource.trim()) return;
+    setTryRunning(true);
+    try {
+      const result = await executeSource(token, trySource, theme.id);
+      setTryResult(result);
+    } catch (reason) {
+      setTryResult({
+        status: 'runtime_error',
+        stderr_raw: reason instanceof Error ? reason.message : 'Could not run this code.',
+      });
+    } finally {
+      setTryRunning(false);
+    }
+  };
+
   return (
     <div className="edu-page">
       <ProductHeader onNavigate={onNavigate} active="dictionary" />
@@ -583,6 +606,31 @@ function DictionaryPage({ theme, token, onNavigate, onThemeRegenerated }: { them
         <section className="edu-dictionary-heading">
           <div><span><Library /></span><h1>{theme.theme_name} Python Dictionary</h1><p>Every generated personal token, connected back to canonical Python.</p></div>
           <Dino />
+        </section>
+
+        <section className="edu-dictionary-tryit">
+          <h3><Zap /> Try it</h3>
+          <p>Write personal syntax and run it against the real backend — no lesson required. Keep the <code>@theme</code>/<code>@language</code>/<code>@version</code> header and <code>---</code> separator; edit the code below it.</p>
+          <div className="edu-challenge-editor">
+            <div>
+              <header><strong>your personal syntax</strong><span>Edit freely</span></header>
+              <textarea
+                value={trySource}
+                onChange={(event) => { setTrySource(event.target.value); setTryResult(null); }}
+                placeholder="Write personal-syntax Python here..."
+                spellCheck={false}
+              />
+            </div>
+            <div>
+              <header><strong>output</strong><span>{tryResult ? tryResult.status : 'Not run yet'}</span></header>
+              <pre className={tryResult && tryResult.status !== 'success' ? 'compile-preview-error' : ''}>
+                {tryResult ? (tryResult.stderr_raw || tryResult.error_message_themed || tryResult.stdout || '(no output)') : 'Run your code to see output here.'}
+              </pre>
+            </div>
+          </div>
+          <button className="edu-run-button" onClick={() => void runTry()} disabled={tryRunning || !trySource.trim()}>
+            <Play /> {tryRunning ? 'Running...' : 'Run code'}
+          </button>
         </section>
 
         {loading ? <div className="edu-inline-loading"><div className="spinner" /> Loading the complete Python dictionary...</div> : error ? <div className="edu-inline-error">{error}</div> : catalog && <>

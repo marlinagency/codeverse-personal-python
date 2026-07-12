@@ -3,6 +3,7 @@ import { EditorPage } from './pages/EditorPage';
 import { AlertCircle } from 'lucide-react';
 import { BASE_URL } from './lib/api';
 import { DemoDirector } from './components/DemoDirector';
+import { CustomCursor } from './components/CustomCursor';
 
 interface User {
   id: string;
@@ -76,9 +77,12 @@ function App() {
   }
 
   return (
-    new URLSearchParams(window.location.search).get('demo') === '1'
-      ? <DemoDirector token={token!} />
-      : <EditorPage token={token!} user={user} />
+    <>
+      <CustomCursor />
+      {new URLSearchParams(window.location.search).get('demo') === '1'
+        ? <DemoDirector token={token!} />
+        : <EditorPage token={token!} user={user} />}
+    </>
   );
 }
 

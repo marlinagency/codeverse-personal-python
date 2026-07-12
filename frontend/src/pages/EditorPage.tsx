@@ -341,6 +341,104 @@ const FloatingRocket: React.FC = () => {
   );
 };
 
+const CursorShowcase: React.FC = () => {
+  const [customEnabled, setCustomEnabled] = useState(() => {
+    const val = localStorage.getItem('use-custom-cursor');
+    return val === null ? true : val === 'true';
+  });
+  
+  const handleToggle = () => {
+    const next = !customEnabled;
+    setCustomEnabled(next);
+    window.dispatchEvent(new CustomEvent('toggle-custom-cursor', { detail: next }));
+  };
+
+  const triggerFakeLoading = () => {
+    window.dispatchEvent(new CustomEvent('app-loading', { detail: true }));
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('app-loading', { detail: false }));
+    }, 3000);
+  };
+
+  return (
+    <div className="cursor-showcase">
+      <div className="cursor-showcase-card">
+        <div className="cursor-showcase-header">
+          <div>
+            <h4 className="cursor-showcase-title">Dino Pixel Cursor Pack</h4>
+            <p className="text-xs text-secondary mt-1">
+              Toggle between custom pixel-art and system cursors.
+            </p>
+          </div>
+          <button 
+            onClick={handleToggle}
+            className={`cursor-toggle-btn ${customEnabled ? 'active' : ''}`}
+          >
+            {customEnabled ? 'Custom Cursors ON' : 'Custom Cursors OFF'}
+          </button>
+        </div>
+      </div>
+
+      <div className="cursor-showcase-card">
+        <h4 className="cursor-showcase-title">Interactive Cursors Catalog</h4>
+        <p className="text-xs text-secondary mb-1">
+          Hover over each card below to see and test the cursor state!
+        </p>
+        <div className="cursor-grid">
+          <div className="cursor-card">
+            <div className="cursor-card-img-container">
+              <img src="/cursors/cursor_normal.png" className="cursor-card-img" alt="Normal Arrow" />
+            </div>
+            <span className="cursor-card-label">Normal Selection</span>
+          </div>
+
+          <div className="cursor-card cursor-pointer">
+            <div className="cursor-card-img-container">
+              <img src="/cursors/cursor_pointer.png" className="cursor-card-img" alt="Pointer Hand" />
+            </div>
+            <span className="cursor-card-label">Pointer / Hover</span>
+          </div>
+
+          <div className="cursor-card" style={{ cursor: 'text' }}>
+            <div className="cursor-card-img-container">
+              <img src="/cursors/cursor_text.png" className="cursor-card-img" style={{ height: '36px' }} alt="Text Selection" />
+            </div>
+            <span className="cursor-card-label">Text Selection</span>
+          </div>
+
+          <div className="cursor-card" onClick={triggerFakeLoading}>
+            <div className="cursor-card-img-container">
+              <img src="/cursors/cursor_loading.png" className="cursor-card-img" alt="Loading Dino" />
+            </div>
+            <span className="cursor-card-label">Loading Dino (Click to Spin)</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="cursor-test-section">
+        <div className="cursor-test-box">
+          <span className="cursor-test-title">Text Input Field</span>
+          <p className="text-xs text-secondary mb-2">Hover here to test the dinosaur text selection I-beam.</p>
+          <input 
+            type="text" 
+            placeholder="Type anything here..." 
+            className="practice-input"
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        <div className="cursor-test-box">
+          <span className="cursor-test-title">Click Ripple Area</span>
+          <p className="text-xs text-secondary mb-2">Click inside this box to trigger concentric pixel-art ripples.</p>
+          <div className="cursor-test-pad" onClick={() => {}}>
+            Click anywhere inside!
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
   const [themes, setThemes] = useState<ThemeMapping[]>([]);
   const [selectedTheme, setSelectedTheme] = useState<ThemeMapping | null>(null);
@@ -350,7 +448,8 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
   const [isCompiling, setIsCompiling] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [runResult, setRunResult] = useState<any | null>(null);
-  const [activeRightTab, setActiveRightTab] = useState<'output' | 'dictionary' | 'learning'>('output');
+  const [activeRightTab, setActiveRightTab] = useState<'output' | 'dictionary' | 'learning' | 'cursors'>('output');
+
   const [searchQuery, setSearchQuery] = useState('');
   const [learningPath, setLearningPath] = useState<LearningPath | null>(null);
   const [selectedLearningModuleId, setSelectedLearningModuleId] = useState<string>('');
@@ -368,6 +467,12 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
   const [moduleProgress, setModuleProgress] = useState<Record<string, ModuleProgress>>({});
   const [productView, setProductView] = useState<EducationView>('learn');
   const selectedLanguage = 'python' as const;
+
+  // Synchronize custom cursor loading state
+  useEffect(() => {
+    const isAppLoading = isCompiling || isRunning || isGrading || isLearningLoading || codeRunningId !== null || practiceCheckingId !== null;
+    window.dispatchEvent(new CustomEvent('app-loading', { detail: isAppLoading }));
+  }, [isCompiling, isRunning, isGrading, isLearningLoading, codeRunningId, practiceCheckingId]);
 
   const fetchThemes = async () => {
     try {
@@ -1006,6 +1111,16 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
               >
                 Dictionary
               </button>
+              <button
+                onClick={() => setActiveRightTab('cursors')}
+                className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors border-0 cursor-pointer ${
+                  activeRightTab === 'cursors'
+                    ? 'bg-primary-glow text-primary'
+                    : 'bg-transparent text-secondary hover:text-primary'
+                }`}
+              >
+                Cursors
+              </button>
             </div>
 
             {activeRightTab === 'dictionary' && (
@@ -1328,6 +1443,8 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
                   <OutputPanel result={runResult} isLoading={isRunning} />
                 </div>
               </div>
+            ) : activeRightTab === 'cursors' ? (
+              <CursorShowcase />
             ) : (
               <div className="flex flex-col gap-4 flex-grow min-h-0">
                 {coreLearningMappings.length > 0 && (

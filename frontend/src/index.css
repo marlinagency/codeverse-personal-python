@@ -4210,7 +4210,7 @@ textarea:focus {
   font-weight: 600;
 }
 
-.edu-lesson-copy > div {
+.edu-lesson-steps > div {
   display: grid;
   grid-template-columns: 28px 1fr;
   align-items: start;
@@ -4218,7 +4218,7 @@ textarea:focus {
   margin-bottom: 12px;
 }
 
-.edu-lesson-copy > div > span {
+.edu-lesson-steps > div > span {
   display: grid;
   place-items: center;
   width: 26px;
@@ -4232,22 +4232,23 @@ textarea:focus {
 .edu-lesson-copy p { margin: 3px 0 0; color: #3f4851; font-size: 12px; line-height: 1.55; }
 .edu-lesson-copy .misconception { display: flex; align-items: flex-start; gap: 9px; margin: 10px 0; padding: 10px; border-left: 2px solid #d64a34; background: rgba(214, 74, 52, 0.05); }
 .edu-lesson-copy .misconception svg { flex: none; width: 16px; color: #d64a34; }
-.edu-section-list { display: grid; gap: 22px; }
-.edu-lesson-copy .edu-lesson-section { padding: 0 0 22px; border-bottom: 1px solid rgba(17, 24, 32, 0.18); }
+.edu-section-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; min-width: 0; }
+.edu-lesson-copy .edu-lesson-section { min-width: 0; padding: 0 0 22px; border-bottom: 1px solid rgba(17, 24, 32, 0.18); }
 .edu-lesson-copy .edu-lesson-section:last-child { border-bottom: 0; }
 .edu-lesson-section header { display: flex; align-items: flex-start; gap: 12px; }
 .edu-lesson-section header > span { display: grid; place-items: center; width: 26px; height: 26px; flex: none; border: 1px solid #1769df; border-radius: 50%; color: #1769df; font: 600 11px var(--font-mono); }
-.edu-lesson-section header div { min-width: 0; }
+.edu-lesson-section header div { min-width: 0; overflow-wrap: anywhere; }
 .edu-lesson-section header small { display: block; color: #65707a; font-size: 10px; line-height: 1.4; }
 .edu-lesson-section h4 { margin: 3px 0 0; color: #111820; font-size: 16px; font-weight: 600; }
-.edu-lesson-copy .edu-lesson-section > p { margin: 12px 0; font-size: 12px; line-height: 1.65; }
+.edu-lesson-copy .edu-lesson-section > p { margin: 12px 0; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
 .edu-lesson-section ul { margin: 0 0 14px; padding-left: 18px; color: #3f4851; font-size: 11px; line-height: 1.7; }
-.edu-section-code { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid rgba(17, 24, 32, 0.22); border-radius: 6px; overflow: hidden; }
+.edu-section-code { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; border: 1px solid rgba(17, 24, 32, 0.22); border-radius: 6px; overflow: hidden; }
+.edu-section-code > div { min-width: 0; }
 .edu-section-code > div + div { border-left: 1px solid rgba(17, 24, 32, 0.18); }
 .edu-section-code small,
 .edu-section-output small { display: block; padding: 7px 10px; border-bottom: 1px solid rgba(17, 24, 32, 0.12); color: #65707a; font: 600 9px var(--font-mono); text-transform: uppercase; }
 .edu-section-code pre,
-.edu-section-output pre { margin: 0; padding: 12px; overflow-x: auto; color: #111820; font: 11px/1.65 var(--font-mono); white-space: pre; }
+.edu-section-output pre { max-width: 100%; margin: 0; padding: 12px; overflow-x: auto; color: #111820; font: 11px/1.65 var(--font-mono); white-space: pre; }
 .edu-section-output { margin-top: 10px; border-left: 2px solid #58742f; background: rgba(88, 116, 47, 0.06); }
 @media (max-width: 760px) { .edu-section-code { grid-template-columns: 1fr; } .edu-section-code > div + div { border-left: 0; border-top: 1px solid rgba(17, 24, 32, 0.18); } }
 
@@ -4453,6 +4454,14 @@ textarea:focus {
 .edu-dictionary-heading p { margin: 6px 0 0; color: #59616a; font-size: 13px; }
 .edu-dictionary-heading .edu-dino { flex: none; width: 78px; height: 78px; }
 
+.edu-dictionary-tryit { margin-bottom: 22px; padding: 20px 22px; border: 1px solid rgba(17, 24, 32, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.48); }
+.edu-dictionary-tryit h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 600; }
+.edu-dictionary-tryit h3 svg { width: 16px; color: #1769df; }
+.edu-dictionary-tryit > p { margin: 4px 0 0; color: #59616a; font-size: 12px; }
+.edu-dictionary-tryit .edu-challenge-editor { min-height: 200px; }
+.edu-dictionary-tryit .edu-challenge-editor textarea, .edu-dictionary-tryit .edu-challenge-editor pre { height: 180px; }
+.edu-dictionary-tryit .edu-run-button { margin-top: 14px; width: 160px; }
+
 .edu-quality-band {
   display: grid;
   grid-template-columns: 1.2fr repeat(3, 1fr) auto;
@@ -4632,4 +4641,253 @@ textarea:focus {
   .edu-assessment-heading, .edu-assessment-locked { align-items: flex-start; flex-direction: column; }
   .edu-assessment-result { grid-template-columns: 1fr; }
   .edu-question > div { grid-template-columns: 1fr; }
+}
+
+/* Custom Cursor CSS Definitions */
+
+/* Global cursor-hide classes when custom cursor is active */
+body.use-custom-cursor,
+body.use-custom-cursor * {
+  cursor: none !important;
+}
+
+/* Fallback CSS cursors (standard 32px versions) when JS custom cursor is disabled */
+body:not(.use-custom-cursor) {
+  cursor: url('/cursors/cursor_normal_32.png') 0 0, auto;
+}
+body:not(.use-custom-cursor) button,
+body:not(.use-custom-cursor) a,
+body:not(.use-custom-cursor) [role="button"],
+body:not(.use-custom-cursor) .cursor-pointer,
+body:not(.use-custom-cursor) .edu-tabs button,
+body:not(.use-custom-cursor) .module-strip button,
+body:not(.use-custom-cursor) .director-transport button,
+body:not(.use-custom-cursor) .director-tools button {
+  cursor: url('/cursors/cursor_pointer_32.png') 10 0, pointer !important;
+}
+body:not(.use-custom-cursor) input[type="text"],
+body:not(.use-custom-cursor) input[type="email"],
+body:not(.use-custom-cursor) textarea,
+body:not(.use-custom-cursor) .monaco-editor,
+body:not(.use-custom-cursor) .monaco-mouse-cursor-text,
+body:not(.use-custom-cursor) .practice-code-editor {
+  cursor: url('/cursors/cursor_text_32.png') 9 16, text !important;
+}
+
+/* Custom JS Cursor layout */
+.custom-cursor-container {
+  position: fixed;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 999999;
+  will-change: transform;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  transition: opacity 0.2s ease-out;
+}
+
+.custom-cursor-image-wrapper {
+  position: relative;
+  display: inline-block;
+  will-change: transform;
+}
+
+.custom-cursor-image {
+  display: block;
+  height: var(--cursor-size, 32px);
+  width: auto;
+  image-rendering: pixelated;
+  will-change: transform;
+  transition: transform 0.15s ease-out;
+}
+
+/* Click ripple animation */
+.custom-cursor-ripple {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #fdcb1f;
+  transform: translate(-50%, -50%) scale(0.1);
+  opacity: 0.8;
+  animation: cursor-ripple-anim 0.5s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes cursor-ripple-anim {
+  0% {
+    transform: translate(-50%, -50%) scale(0.1);
+    opacity: 0.8;
+    border-width: 3px;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0;
+    border-width: 1px;
+  }
+}
+
+/* Loading rotation animation for the outer dotted ring in cursor_loading */
+.custom-cursor-loading-rotate {
+  animation: cursor-loading-spin 2s linear infinite;
+}
+
+@keyframes cursor-loading-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Interactive Cursor Showcase tab styles */
+.cursor-showcase {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+  overflow-y: auto;
+  color: #c7cdd1;
+}
+
+.cursor-showcase-card {
+  background: rgba(17, 24, 32, 0.3);
+  border: 1px solid rgba(199, 205, 209, 0.15);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cursor-showcase-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cursor-showcase-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fdcb1f;
+}
+
+.cursor-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid #fdcb1f;
+  background: rgba(253, 203, 31, 0.1);
+  color: #fdcb1f;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cursor-toggle-btn:hover {
+  background: rgba(253, 203, 31, 0.2);
+}
+
+.cursor-toggle-btn.active {
+  background: #fdcb1f;
+  color: #111820;
+}
+
+.cursor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+
+.cursor-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cursor-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(253, 203, 31, 0.3);
+  transform: translateY(-2px);
+}
+
+.cursor-card-img-container {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cursor-card-img {
+  height: 40px;
+  width: auto;
+  image-rendering: pixelated;
+}
+
+.cursor-card-label {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.cursor-test-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .cursor-test-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cursor-test-box {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cursor-test-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #fdcb1f;
+}
+
+.cursor-test-pad {
+  height: 100px;
+  background: rgba(253, 203, 31, 0.03);
+  border: 1.5px dashed rgba(253, 203, 31, 0.2);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  text-align: center;
+  user-select: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cursor-test-pad:hover {
+  background: rgba(253, 203, 31, 0.06);
+  border-color: rgba(253, 203, 31, 0.4);
 }
