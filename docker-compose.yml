@@ -5,8 +5,8 @@ services:
       POSTGRES_USER: codeverse
       POSTGRES_PASSWORD: codeverse
       POSTGRES_DB: codeverse
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     volumes:
       - codeverse-pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -23,8 +23,8 @@ services:
       - .env
     environment:
       CODEVERSE_DATABASE_URL: postgresql+psycopg://codeverse:codeverse@postgres:5432/codeverse
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     depends_on:
       postgres:
         condition: service_healthy

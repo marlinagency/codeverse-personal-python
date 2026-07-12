@@ -52,6 +52,9 @@ docker compose up -d --build
   break on the public site.
 - Postgres data persists in the `codeverse-pgdata` volume; `docker compose
   down` keeps it, `down -v` wipes it.
+- The backend applies Alembic migrations automatically before it starts.
+  PostgreSQL and FastAPI stay private inside Compose; only nginx port 80 is
+  published to the internet.
 - Update flow: `git pull && docker compose up -d --build`.
 - Rough cost: a small CPU droplet runs weeks on the $100 credit; visitor
   theme generations cost ~1-2 Fireworks cents each.
