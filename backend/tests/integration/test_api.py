@@ -609,6 +609,63 @@ def test_progress_best_score_never_regresses(client: TestClient):
     assert routes["passed"] is True
 
 
+def test_learning_assessment_records_locked_baseline_and_measurable_gain(
+    client: TestClient,
+):
+    headers = _auth(client)
+    created = _make_theme(client, headers)
+    endpoint = f"/learning/{created['id']}/assessment"
+
+    initial = client.get(endpoint, headers=headers)
+    assert initial.status_code == 200, initial.text
+    evidence = initial.json()
+    assert evidence["readiness"] == "take_baseline"
+    assert evidence["pre_score"] is None
+    assert len(evidence["questions"]) == 8
+    assert all("correct_answer" not in question for question in evidence["questions"])
+
+    choices = {question["id"]: question["choices"][0] for question in evidence["questions"]}
+    baseline = client.post(f"{endpoint}/pre", json={"answers": choices}, headers=headers)
+    assert baseline.status_code == 200, baseline.text
+    baseline_score = baseline.json()["score"]
+
+    # A second baseline submission cannot rewrite the learner's starting point.
+    alternate = {question["id"]: question["choices"][-1] for question in evidence["questions"]}
+    locked = client.post(f"{endpoint}/pre", json={"answers": alternate}, headers=headers)
+    assert locked.status_code == 200
+    assert locked.json()["baseline_locked"] is True
+    assert locked.json()["score"] == baseline_score
+
+    # Use the public questions and known curriculum answers to prove post-test gain.
+    correct = {
+        "values-output": "7",
+        "conditions-branch": "B",
+        "loops-range": "1, 2, 3",
+        "functions-return": "12",
+        "collections-list": "3",
+        "errors-finally": "finally",
+        "files-context": "It automatically closes the file",
+        "objects-instance": "The current object",
+    }
+    post = client.post(f"{endpoint}/post", json={"answers": correct}, headers=headers)
+    assert post.status_code == 200, post.text
+    assert post.json()["score"] == 100
+
+    final = client.get(endpoint, headers=headers).json()
+    assert final["readiness"] == "evidence_ready"
+    assert final["pre_score"] == baseline_score
+    assert final["post_score"] == 100
+    assert final["gain"] == 100 - baseline_score
+    assert set(final["concept_gain"]) == {
+        "values", "conditions", "loops", "functions", "collections", "errors", "files", "objects"
+    }
+
+    # Assessment internals do not inflate completed lesson counts.
+    progress = client.get(f"/learning/{created['id']}/progress", headers=headers).json()
+    assert progress["completed_count"] == 0
+    assert all(not row["module_id"].startswith("assessment-") for row in progress["modules"])
+
+
 # --------------------------------------------------------- cross-user isolation
 
 

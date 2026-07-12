@@ -55,6 +55,33 @@ class ProgressRepository:
         self._db.flush()
         return row
 
+    def record_initial_score(
+        self,
+        user_id: uuid.UUID,
+        theme_dictionary_id: uuid.UUID,
+        module_id: str,
+        score: int,
+    ) -> ModuleProgress:
+        """Record a baseline once and never replace it on a later attempt."""
+        existing = self.get(user_id, theme_dictionary_id, module_id)
+        if existing is not None:
+            return existing
+        return self.record_score(user_id, theme_dictionary_id, module_id, score)
+
+    def get(
+        self,
+        user_id: uuid.UUID,
+        theme_dictionary_id: uuid.UUID,
+        module_id: str,
+    ) -> ModuleProgress | None:
+        return self._db.execute(
+            select(ModuleProgress).where(
+                ModuleProgress.user_id == user_id,
+                ModuleProgress.theme_dictionary_id == theme_dictionary_id,
+                ModuleProgress.module_id == module_id,
+            )
+        ).scalars().first()
+
     def list_for_theme(
         self,
         user_id: uuid.UUID,

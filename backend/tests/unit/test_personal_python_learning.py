@@ -18,6 +18,10 @@ from codeverse_core.personal_python.learning import (
     evaluate_practice_answer,
     grade_practice_answers,
 )
+from codeverse_core.personal_python.assessment import (
+    assessment_questions,
+    grade_assessment,
+)
 from codeverse_core.theme_mapping.generator import TaxonomyThemeDictionaryGenerator
 
 
@@ -35,6 +39,26 @@ def _dictionary(prompt: str = "I love Counter-Strike 2 and loops/functions confu
         prompt,
         languages=("python",),
     )
+
+
+def test_real_python_assessment_grades_each_concept_without_personal_syntax():
+    questions = assessment_questions()
+    assert len(questions) == 8
+    assert len({question.concept for question in questions}) == len(questions)
+    assert all("personal" not in question.prompt.casefold() for question in questions)
+
+    answers = {question.id: question.correct_answer for question in questions}
+    result = grade_assessment(answers)
+    assert result.score == 100
+    assert result.correct == result.total == 8
+    assert all(item.score == 100 for item in result.concept_scores)
+
+
+def test_real_python_assessment_treats_missing_answers_as_incorrect():
+    result = grade_assessment({})
+    assert result.score == 0
+    assert result.correct == 0
+    assert len(result.feedback) == 8
 
 
 def test_diagnose_learning_prompt_extracts_practical_learning_profile():

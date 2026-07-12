@@ -194,6 +194,40 @@ export interface LearningProgress {
   modules: ModuleProgress[]
 }
 
+export interface AssessmentQuestion {
+  id: string
+  concept: string
+  prompt: string
+  choices: string[]
+}
+
+export interface AssessmentConceptScore {
+  concept: string
+  correct: number
+  total: number
+  score: number
+}
+
+export interface AssessmentResult {
+  phase: 'pre' | 'post'
+  score: number
+  correct: number
+  total: number
+  concept_scores: AssessmentConceptScore[]
+  feedback: string[]
+  baseline_locked: boolean
+}
+
+export interface LearningEvidence {
+  theme_dictionary_id: string
+  questions: AssessmentQuestion[]
+  pre_score: number | null
+  post_score: number | null
+  gain: number | null
+  concept_gain: Record<string, number>
+  readiness: 'take_baseline' | 'learning_in_progress' | 'ready_for_posttest' | 'evidence_ready'
+}
+
 export interface ProgressProof {
   theme_dictionary_id: string
   headline: string

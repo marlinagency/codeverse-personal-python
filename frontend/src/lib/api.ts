@@ -4,9 +4,11 @@ import type {
   CompileResult,
   ExecutionRunResult,
   LearningModule,
+  LearningEvidence,
   LearningPath,
   LearningProgress,
   MasteryReport,
+  AssessmentResult,
   PracticeEvaluation,
   PracticeRunResult,
   ProgressProof,
@@ -124,6 +126,23 @@ export function getLearningPath(token: string, themeId: string): Promise<Learnin
 
 export function getLearningProgress(token: string, themeId: string): Promise<LearningProgress> {
   return request(`/learning/${themeId}/progress`, { token })
+}
+
+export function getLearningAssessment(token: string, themeId: string): Promise<LearningEvidence> {
+  return request(`/learning/${themeId}/assessment`, { token })
+}
+
+export function submitLearningAssessment(
+  token: string,
+  themeId: string,
+  phase: 'pre' | 'post',
+  answers: Record<string, string>,
+): Promise<AssessmentResult> {
+  return request(`/learning/${themeId}/assessment/${phase}`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ answers }),
+  })
 }
 
 export function getProgressProof(token: string, themeId: string): Promise<ProgressProof> {

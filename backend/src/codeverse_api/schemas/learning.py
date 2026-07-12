@@ -180,3 +180,41 @@ class LearningProgressOut(BaseModel):
     theme_dictionary_id: uuid.UUID
     completed_count: int
     modules: list[ModuleProgressOut]
+
+
+class AssessmentQuestionOut(BaseModel):
+    id: str
+    concept: str
+    prompt: str
+    choices: list[str]
+
+
+class AssessmentSubmitRequest(BaseModel):
+    answers: dict[str, str] = Field(default_factory=dict)
+
+
+class AssessmentConceptScoreOut(BaseModel):
+    concept: str
+    correct: int
+    total: int
+    score: int
+
+
+class AssessmentResultOut(BaseModel):
+    phase: str
+    score: int
+    correct: int
+    total: int
+    concept_scores: list[AssessmentConceptScoreOut]
+    feedback: list[str]
+    baseline_locked: bool
+
+
+class LearningEvidenceOut(BaseModel):
+    theme_dictionary_id: uuid.UUID
+    questions: list[AssessmentQuestionOut]
+    pre_score: int | None
+    post_score: int | None
+    gain: int | None
+    concept_gain: dict[str, int]
+    readiness: str

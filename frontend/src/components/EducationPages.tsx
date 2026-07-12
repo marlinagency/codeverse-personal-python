@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
+  BarChart3,
   BookOpen,
   Check,
   CheckCircle2,
@@ -26,6 +27,7 @@ import {
   compileSource,
   getBridgeChallenge,
   getLearningLesson,
+  getLearningAssessment,
   getLearningPath,
   getLearningProgress,
   getProgressProof,
@@ -33,11 +35,14 @@ import {
   gradePractice,
   regenerateTheme,
   runPracticeCode,
+  submitLearningAssessment,
 } from '../lib/api';
 import type {
+  AssessmentResult,
   BridgeChallenge,
   BridgeCheckResult,
   LearningModule,
+  LearningEvidence,
   LearningPath,
   LearningProgress,
   MasteryReport,
@@ -49,7 +54,7 @@ import type {
   ThemeDictionary,
 } from '../lib/types';
 
-export type EducationView = 'learn' | 'lesson' | 'challenge' | 'graduation' | 'dictionary' | 'playground';
+export type EducationView = 'learn' | 'lesson' | 'challenge' | 'assessment' | 'graduation' | 'dictionary' | 'playground';
 
 interface EducationTheme {
   id: string;
@@ -176,11 +181,12 @@ interface LearnDashboardProps {
   path: LearningPath;
   progress: LearningProgress;
   proof: ProgressProof;
+  evidence: LearningEvidence;
   onOpenLesson: (moduleId: string) => void;
   onNavigate: (view: EducationView) => void;
 }
 
-function LearnDashboard({ path, progress, proof, onOpenLesson, onNavigate }: LearnDashboardProps) {
+function LearnDashboard({ path, progress, proof, evidence, onOpenLesson, onNavigate }: LearnDashboardProps) {
   const byModule = progressMap(progress);
   const graduation = byModule.graduation;
   const completedModules = path.modules.filter((module) => byModule[module.module_id]?.passed).length;
@@ -234,6 +240,15 @@ function LearnDashboard({ path, progress, proof, onOpenLesson, onNavigate }: Lea
 
           <aside className="edu-dashboard-side">
             <Dino />
+            <section className="edu-side-card edu-evidence-card">
+              <h3><BarChart3 /> Learning evidence</h3>
+              <div className="edu-evidence-scores">
+                <span><small>Baseline</small><strong>{evidence.pre_score ?? '--'}%</strong></span>
+                <span><small>Final</small><strong>{evidence.post_score ?? '--'}%</strong></span>
+                <span><small>Gain</small><strong>{evidence.gain === null ? '--' : `${evidence.gain >= 0 ? '+' : ''}${evidence.gain}`} pts</strong></span>
+              </div>
+              <button onClick={() => onNavigate('assessment')}>{evidence.pre_score === null ? 'Take baseline' : evidence.post_score === null ? 'Measure final skill' : 'View evidence'} <ArrowRight /></button>
+            </section>
             <section className="edu-side-card">
               <h3><BookOpen /> Current concepts</h3>
               {(previewModule?.concepts || []).slice(0, 4).map((concept) => <div className="edu-map-row" key={concept.concept_id}><code>{concept.personal_token}</code><span>-&gt;</span><code>{concept.python_concept}</code></div>)}
@@ -631,6 +646,86 @@ interface GraduationPageProps {
   onNavigate: (view: EducationView) => void;
 }
 
+interface AssessmentPageProps {
+  theme: EducationTheme;
+  token: string;
+  evidence: LearningEvidence;
+  onEvidenceChanged: () => Promise<LearningEvidence>;
+  onNavigate: (view: EducationView) => void;
+}
+
+function AssessmentPage({ theme, token, evidence, onEvidenceChanged, onNavigate }: AssessmentPageProps) {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [result, setResult] = useState<AssessmentResult | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const phase: 'pre' | 'post' = evidence.pre_score === null ? 'pre' : 'post';
+  const finalLocked = phase === 'post' && evidence.readiness === 'learning_in_progress';
+  const allAnswered = evidence.questions.every((question) => Boolean(answers[question.id]));
+
+  const submit = async () => {
+    if (!allAnswered || finalLocked) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const checked = await submitLearningAssessment(token, theme.id, phase, answers);
+      setResult(checked);
+      await onEvidenceChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Assessment could not be checked.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="edu-page">
+      <ProductHeader onNavigate={onNavigate} />
+      <main className="edu-main edu-assessment">
+        <div className="edu-breadcrumb"><button onClick={() => onNavigate('learn')}>Learn</button><span>/</span><strong>Learning Evidence</strong></div>
+        <section className="edu-assessment-heading">
+          <div><span><BarChart3 /></span><h1>{evidence.post_score !== null ? 'Your Python learning evidence' : phase === 'pre' ? 'Set your Python baseline' : 'Measure what you learned'}</h1><p>The same eight real Python concepts are measured before and after the course. Personal tokens never appear in this test.</p></div>
+          <Dino />
+        </section>
+
+        <section className="edu-assessment-summary">
+          <div><small>Baseline</small><strong>{evidence.pre_score ?? '--'}%</strong></div>
+          <div><small>Final</small><strong>{evidence.post_score ?? '--'}%</strong></div>
+          <div><small>Learning gain</small><strong>{evidence.gain === null ? '--' : `${evidence.gain >= 0 ? '+' : ''}${evidence.gain} pts`}</strong></div>
+          <div><small>Evidence status</small><strong>{evidence.readiness.replaceAll('_', ' ')}</strong></div>
+        </section>
+
+        {evidence.post_score !== null && !result ? (
+          <section className="edu-gain-report">
+            <h2>Concept-level gain</h2>
+            <div>{Object.entries(evidence.concept_gain).map(([concept, gain]) => <span key={concept}><strong>{concept}</strong><i className={gain >= 0 ? 'positive' : 'negative'}>{gain >= 0 ? '+' : ''}{gain} pts</i></span>)}</div>
+            <button onClick={() => onNavigate('learn')}>Return to learning path <ArrowRight /></button>
+          </section>
+        ) : finalLocked ? (
+          <section className="edu-assessment-locked"><GraduationCap /><div><h2>Final test unlocks after graduation</h2><p>Complete the learning modules and the real-Python graduation bridge first. Your baseline is safely locked.</p></div><button onClick={() => onNavigate('graduation')}>Open graduation bridge <ArrowRight /></button></section>
+        ) : (
+          <>
+            <div className="edu-question-grid">
+              {evidence.questions.map((question, index) => (
+                <fieldset key={question.id} className="edu-question">
+                  <legend><span>{String(index + 1).padStart(2, '0')}</span><strong>{question.concept}</strong></legend>
+                  <pre>{question.prompt}</pre>
+                  <div>{question.choices.map((choice) => <label key={choice} className={answers[question.id] === choice ? 'selected' : ''}><input type="radio" name={question.id} value={choice} checked={answers[question.id] === choice} onChange={() => setAnswers((current) => ({ ...current, [question.id]: choice }))} /><span>{choice}</span></label>)}</div>
+                </fieldset>
+              ))}
+            </div>
+            <div className="edu-assessment-actions"><p>{Object.keys(answers).length} / {evidence.questions.length} answered</p><button disabled={!allAnswered || submitting} onClick={submit}><BarChart3 /> {submitting ? 'Scoring...' : phase === 'pre' ? 'Lock baseline' : 'Calculate learning gain'}</button></div>
+          </>
+        )}
+
+        {error && <div className="edu-inline-error">{error}</div>}
+        {result && <section className="edu-assessment-result"><div><span>{result.score}%</span><h2>{result.correct} of {result.total} correct</h2><p>{result.phase === 'pre' ? 'Baseline saved. This score will not change on a retry.' : 'Final score saved. Your learning gain is now measurable.'}</p></div><div>{result.concept_scores.map((item) => <span key={item.concept} className={item.score === 100 ? 'pass' : ''}>{item.score === 100 ? <Check /> : <X />} {item.concept}</span>)}</div><button onClick={() => onNavigate('learn')}>Continue learning <ArrowRight /></button></section>}
+      </main>
+      <PageFooter />
+    </div>
+  );
+}
+
 function GraduationPage({ theme, token, progress, onProgressChanged, onNavigate }: GraduationPageProps) {
   const [challenge, setChallenge] = useState<BridgeChallenge | null>(null);
   const [source, setSource] = useState('# Rewrite the personal program using standard Python.\n');
@@ -690,6 +785,7 @@ export function EducationPages({ view, theme, token, onNavigate, onThemeRegenera
   const [path, setPath] = useState<LearningPath | null>(null);
   const [progress, setProgress] = useState<LearningProgress | null>(null);
   const [proof, setProof] = useState<ProgressProof | null>(null);
+  const [evidence, setEvidence] = useState<LearningEvidence | null>(null);
   const [selectedModuleId, setSelectedModuleId] = useState('');
   const [lesson, setLesson] = useState<LearningModule | null>(null);
   const [loading, setLoading] = useState(true);
@@ -700,14 +796,16 @@ export function EducationPages({ view, theme, token, onNavigate, onThemeRegenera
     setLoading(true);
     setError('');
     try {
-      const [pathData, progressData, proofData] = await Promise.all([
+      const [pathData, progressData, proofData, evidenceData] = await Promise.all([
         getLearningPath(token, theme.id),
         getLearningProgress(token, theme.id),
         getProgressProof(token, theme.id),
+        getLearningAssessment(token, theme.id),
       ]);
       setPath(pathData);
       setProgress(progressData);
       setProof(proofData);
+      setEvidence(evidenceData);
       setSelectedModuleId((current) => current || pathData.diagnosis.recommended_start || pathData.modules[0]?.module_id || '');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Learning path could not load.');
@@ -719,6 +817,12 @@ export function EducationPages({ view, theme, token, onNavigate, onThemeRegenera
   const refreshProgress = useCallback(async () => {
     const data = await getLearningProgress(token, theme.id);
     setProgress(data);
+  }, [theme.id, token]);
+
+  const refreshEvidence = useCallback(async () => {
+    const data = await getLearningAssessment(token, theme.id);
+    setEvidence(data);
+    return data;
   }, [theme.id, token]);
 
   useEffect(() => { void loadOverview(); }, [loadOverview]);
@@ -739,16 +843,17 @@ export function EducationPages({ view, theme, token, onNavigate, onThemeRegenera
   const openLesson = (moduleId: string) => { setSelectedModuleId(moduleId); onNavigate('lesson'); };
   const selectLesson = (moduleId: string) => { setSelectedModuleId(moduleId); setLesson(null); };
 
-  if (loading || !path || !progress || !proof) {
+  if (loading || !path || !progress || !proof || !evidence) {
     if (error) return <ErrorScreen message={error} onRetry={() => void loadOverview()} onNavigate={onNavigate} />;
     return <LoadingScreen onNavigate={onNavigate} />;
   }
   if (view === 'dictionary') return <DictionaryPage theme={theme} token={token} onNavigate={onNavigate} onThemeRegenerated={onThemeRegenerated} />;
+  if (view === 'assessment') return <AssessmentPage theme={theme} token={token} evidence={evidence} onEvidenceChanged={refreshEvidence} onNavigate={onNavigate} />;
   if (view === 'graduation') return <GraduationPage theme={theme} token={token} progress={progress} onProgressChanged={refreshProgress} onNavigate={onNavigate} />;
   if (view === 'lesson' || view === 'challenge') {
     if (lessonLoading || !lesson) return <LoadingScreen onNavigate={onNavigate} />;
     if (view === 'challenge') return <ChallengePage lesson={lesson} theme={theme} token={token} onProgressChanged={refreshProgress} onNavigate={onNavigate} />;
     return <LessonPage path={path} lesson={lesson} progress={progress} onSelectModule={selectLesson} onStartPractice={() => onNavigate('challenge')} onNavigate={onNavigate} />;
   }
-  return <LearnDashboard path={path} progress={progress} proof={proof} onOpenLesson={openLesson} onNavigate={onNavigate} />;
+  return <LearnDashboard path={path} progress={progress} proof={proof} evidence={evidence} onOpenLesson={openLesson} onNavigate={onNavigate} />;
 }

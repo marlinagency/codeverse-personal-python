@@ -4,6 +4,13 @@ from codeverse_core.personal_python.lesson import (
     PersonalPythonLesson,
     build_personal_python_lesson,
 )
+from codeverse_core.personal_python.assessment import (
+    AssessmentQuestion,
+    AssessmentResult,
+    ConceptScore,
+    assessment_questions,
+    grade_assessment,
+)
 from codeverse_core.personal_python.learning import (
     BridgeChallenge,
     LearnerDiagnosis,
@@ -31,7 +38,10 @@ from codeverse_core.personal_python.learning import (
 )
 
 __all__ = [
+    "AssessmentQuestion",
+    "AssessmentResult",
     "BridgeChallenge",
+    "ConceptScore",
     "LearnerDiagnosis",
     "LearningConcept",
     "LearningModule",
@@ -49,6 +59,7 @@ __all__ = [
     "build_learning_path",
     "build_personal_python_lesson",
     "build_progress_proof",
+    "assessment_questions",
     "code_task_expected_stdout",
     "code_task_module_id",
     "code_task_reference_solution",
@@ -56,4 +67,5 @@ __all__ = [
     "diagnose_learning_prompt",
     "evaluate_practice_answer",
     "grade_practice_answers",
+    "grade_assessment",
 ]

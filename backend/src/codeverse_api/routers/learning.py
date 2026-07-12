@@ -13,6 +13,10 @@ from codeverse_api.repositories.progress_repository import ProgressRepository
 from codeverse_api.repositories.theme_repository import ThemeRepository
 from codeverse_api.routers.execute import run_local_python_demo
 from codeverse_api.schemas.learning import (
+    AssessmentConceptScoreOut,
+    AssessmentQuestionOut,
+    AssessmentResultOut,
+    AssessmentSubmitRequest,
     BridgeChallengeOut,
     BridgeCheckOut,
     BridgeCheckRequest,
@@ -23,6 +27,7 @@ from codeverse_api.schemas.learning import (
     LearningModuleOut,
     LearningPathOut,
     LearningProgressOut,
+    LearningEvidenceOut,
     MasteryReportOut,
     ModuleMasteryOut,
     ModuleProgressOut,
@@ -42,6 +47,7 @@ from codeverse_core.personal_python import (
     LearningModule,
     LearningPath,
     PracticeTask,
+    assessment_questions,
     bridge_expected_stdout,
     build_bridge_challenge,
     build_learning_module,
@@ -53,11 +59,15 @@ from codeverse_core.personal_python import (
     diagnose_learning_prompt,
     evaluate_practice_answer,
     grade_practice_answers,
+    grade_assessment,
 )
 from codeverse_sandbox.docker_runner import DockerSandboxError, DockerSandboxRunner
 from codeverse_sandbox.limits import SandboxLimits
 
 router = APIRouter(prefix="/learning", tags=["learning"])
+
+_ASSESSMENT_PHASES = {"pre", "post"}
+_ASSESSMENT_PREFIX = "assessment-"
 
 
 @router.post("/diagnose", response_model=LearnerDiagnosisOut)
@@ -262,7 +272,11 @@ def get_learning_progress(
     db: Session = Depends(get_db),
 ) -> LearningProgressOut:
     _load_dictionary(db, user_id, theme_dictionary_id)
-    rows = ProgressRepository(db).list_for_theme(user_id, theme_dictionary_id)
+    rows = [
+        row
+        for row in ProgressRepository(db).list_for_theme(user_id, theme_dictionary_id)
+        if not row.module_id.startswith(_ASSESSMENT_PREFIX)
+    ]
     return LearningProgressOut(
         theme_dictionary_id=theme_dictionary_id,
         completed_count=sum(1 for row in rows if row.passed),
@@ -270,6 +284,91 @@ def get_learning_progress(
             ModuleProgressOut(module_id=row.module_id, best_score=row.best_score, passed=row.passed)
             for row in rows
         ],
+    )
+
+
+@router.get("/{theme_dictionary_id}/assessment", response_model=LearningEvidenceOut)
+def get_learning_assessment(
+    theme_dictionary_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> LearningEvidenceOut:
+    _load_dictionary(db, user_id, theme_dictionary_id)
+    progress = ProgressRepository(db)
+    return _assessment_evidence(theme_dictionary_id, progress, user_id)
+
+
+@router.post(
+    "/{theme_dictionary_id}/assessment/{phase}",
+    response_model=AssessmentResultOut,
+)
+def submit_learning_assessment(
+    theme_dictionary_id: uuid.UUID,
+    phase: str,
+    body: AssessmentSubmitRequest,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> AssessmentResultOut:
+    _load_dictionary(db, user_id, theme_dictionary_id)
+    if phase not in _ASSESSMENT_PHASES:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="assessment phase not found")
+
+    progress = ProgressRepository(db)
+    master_id = f"assessment-{phase}"
+    existing = progress.get(user_id, theme_dictionary_id, master_id)
+    result = grade_assessment(body.answers)
+    baseline_locked = phase == "pre" and existing is not None
+
+    if phase == "pre":
+        master = progress.record_initial_score(
+            user_id, theme_dictionary_id, master_id, result.score
+        )
+        for concept in result.concept_scores:
+            progress.record_initial_score(
+                user_id,
+                theme_dictionary_id,
+                f"assessment-pre-{concept.concept}",
+                concept.score,
+            )
+    else:
+        master = progress.record_score(user_id, theme_dictionary_id, master_id, result.score)
+        for concept in result.concept_scores:
+            progress.record_score(
+                user_id,
+                theme_dictionary_id,
+                f"assessment-post-{concept.concept}",
+                concept.score,
+            )
+    db.commit()
+
+    if baseline_locked:
+        concept_scores = _stored_concept_scores(progress, user_id, theme_dictionary_id, "pre")
+        return AssessmentResultOut(
+            phase=phase,
+            score=master.best_score,
+            correct=round(master.best_score * len(assessment_questions()) / 100),
+            total=len(assessment_questions()),
+            concept_scores=concept_scores,
+            feedback=["Your original baseline is locked so learning gain remains trustworthy."],
+            baseline_locked=True,
+        )
+
+    return AssessmentResultOut(
+        phase=phase,
+        score=master.best_score,
+        correct=result.correct,
+        total=result.total,
+        concept_scores=[
+            AssessmentConceptScoreOut(
+                concept=item.concept,
+                correct=item.correct,
+                total=item.total,
+                score=item.score,
+            )
+            for item in result.concept_scores
+        ],
+        feedback=list(result.feedback),
+        baseline_locked=False,
     )
 
 
@@ -394,6 +493,89 @@ def get_progress_proof(
         bridge_modes=list(proof.bridge_modes),
         concept_coverage=proof.concept_coverage,
     )
+
+
+def _assessment_evidence(
+    theme_dictionary_id: uuid.UUID,
+    progress: ProgressRepository,
+    user_id: uuid.UUID,
+) -> LearningEvidenceOut:
+    pre = progress.get(user_id, theme_dictionary_id, "assessment-pre")
+    post = progress.get(user_id, theme_dictionary_id, "assessment-post")
+    graduation = progress.get(user_id, theme_dictionary_id, "graduation")
+    pre_score = pre.best_score if pre is not None else None
+    post_score = post.best_score if post is not None else None
+
+    concept_gain: dict[str, int] = {}
+    if pre is not None and post is not None:
+        pre_by_concept = {
+            item.concept: item.score
+            for item in _stored_concept_scores(
+                progress, user_id, theme_dictionary_id, "pre"
+            )
+        }
+        post_by_concept = {
+            item.concept: item.score
+            for item in _stored_concept_scores(
+                progress, user_id, theme_dictionary_id, "post"
+            )
+        }
+        concept_gain = {
+            concept: post_by_concept.get(concept, 0) - score
+            for concept, score in pre_by_concept.items()
+        }
+
+    if pre is None:
+        readiness = "take_baseline"
+    elif post is not None:
+        readiness = "evidence_ready"
+    elif graduation is not None and graduation.passed:
+        readiness = "ready_for_posttest"
+    else:
+        readiness = "learning_in_progress"
+
+    return LearningEvidenceOut(
+        theme_dictionary_id=theme_dictionary_id,
+        questions=[
+            AssessmentQuestionOut(
+                id=item.id,
+                concept=item.concept,
+                prompt=item.prompt,
+                choices=list(item.choices),
+            )
+            for item in assessment_questions()
+        ],
+        pre_score=pre_score,
+        post_score=post_score,
+        gain=(post_score - pre_score if pre_score is not None and post_score is not None else None),
+        concept_gain=concept_gain,
+        readiness=readiness,
+    )
+
+
+def _stored_concept_scores(
+    progress: ProgressRepository,
+    user_id: uuid.UUID,
+    theme_dictionary_id: uuid.UUID,
+    phase: str,
+) -> list[AssessmentConceptScoreOut]:
+    scores: list[AssessmentConceptScoreOut] = []
+    for question in assessment_questions():
+        row = progress.get(
+            user_id,
+            theme_dictionary_id,
+            f"assessment-{phase}-{question.concept}",
+        )
+        score = row.best_score if row is not None else 0
+        scores.append(
+            AssessmentConceptScoreOut(
+                concept=question.concept,
+                correct=1 if score == 100 else 0,
+                total=1,
+                score=score,
+            )
+        )
+    return scores
 
 
 def _load_dictionary(db: Session, user_id: uuid.UUID, theme_dictionary_id: uuid.UUID):
