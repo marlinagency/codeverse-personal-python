@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import replace
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from codeverse_api.config import Settings, get_settings
 from codeverse_api.dependencies import (
+    build_amd_provider,
     get_compilation_pipeline,
     get_db,
     get_llm_provider,
@@ -22,7 +25,9 @@ from codeverse_api.schemas.theme import (
     ThemeDictionaryCatalogOut,
     ThemeDictionaryEntryOut,
     ThemeDictionaryOut,
+    ThemeDictionaryQualityOut,
     ThemeGenerateRequest,
+    ThemeRegenerateRequest,
 )
 from codeverse_api.security.auth import get_current_user_id
 from codeverse_core.cvl.pipeline import CompilationError, CompilationPipeline
@@ -31,10 +36,18 @@ from codeverse_core.personal_python import build_personal_python_lesson
 from codeverse_core.theme_mapping.clarifying_questions import generate_clarifying_questions
 from codeverse_core.theme_mapping.generator import TaxonomyThemeDictionaryGenerator
 from codeverse_core.theme_mapping.llm_provider import LLMProvider, LLMProviderError
+from codeverse_core.theme_mapping.quality import assess_dictionary_quality
 from codeverse_core.theme_mapping.taxonomy_generator import TaxonomyGenerationError
 from codeverse_core.theme_mapping.validator import ThemeDictionaryValidationError
 
 router = APIRouter(prefix="/themes", tags=["themes"])
+
+
+def _amd_generator(settings: Settings) -> TaxonomyThemeDictionaryGenerator | None:
+    """A generator backed by our AMD-hosted model, or None when it's disabled."""
+    if not settings.amd_enabled:
+        return None
+    return TaxonomyThemeDictionaryGenerator(build_amd_provider(settings))  # type: ignore
 
 
 @router.post("/generate", response_model=ThemeDictionaryOut, status_code=status.HTTP_201_CREATED)
@@ -44,11 +57,97 @@ def generate_theme(
     db: Session = Depends(get_db),
     generator: TaxonomyThemeDictionaryGenerator = Depends(get_theme_generator),
     provider: LLMProvider = Depends(get_llm_provider),
+    settings: Settings = Depends(get_settings),
 ) -> ThemeDictionaryOut:
-    try:
-        dictionary = generator.generate_profile_seeded(
+    # Curated chips route to the AMD-hosted model (fine-tuned on these exact
+    # prompts). The primary provider is the fallback: if AMD is unreachable or
+    # returns something invalid, we transparently retry with it so the site
+    # never breaks for the visitor.
+    active_generator = generator
+    active_provider = provider
+    if body.use_amd:
+        amd_gen = _amd_generator(settings)
+        if amd_gen is not None:
+            active_generator = amd_gen
+            active_provider = amd_gen.provider  # type: ignore[attr-defined]
+
+    def _run(gen: TaxonomyThemeDictionaryGenerator):
+        return gen.generate_profile_seeded(
             body.theme,
             output_language=body.output_language or "en",
+            languages=("python",),
+            clarifying_answers=body.clarifying_answers,
+        )
+
+    try:
+        dictionary = _run(active_generator)
+    except (ThemeDictionaryValidationError, TaxonomyGenerationError, LLMProviderError) as exc:
+        if active_generator is generator:
+            # already the primary provider — surface the real error
+            if isinstance(exc, LLMProviderError):
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail={
+                        "message": "the LLM provider did not return a valid theme output",
+                        "problems": [str(exc)],
+                    },
+                ) from exc
+            problems = getattr(exc, "problems", [str(exc)])
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"message": "theme dictionary could not be generated", "problems": problems},
+            ) from exc
+        # AMD path failed — fall back to the primary provider
+        active_generator = generator
+        active_provider = provider
+        try:
+            dictionary = _run(active_generator)
+        except (ThemeDictionaryValidationError, TaxonomyGenerationError) as exc2:
+            problems = getattr(exc2, "problems", [str(exc2)])
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"message": "theme dictionary could not be generated", "problems": problems},
+            ) from exc2
+        except LLMProviderError as exc2:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    "message": "the LLM provider did not return a valid theme output",
+                    "problems": [str(exc2)],
+                },
+            ) from exc2
+
+    model_name = getattr(active_provider, "model", active_provider.provider_name)
+    repo = ThemeRepository(db)
+    raw_output = dictionary.profile.raw_model_output if getattr(dictionary, "profile", None) else ""
+    row = repo.save(user_id, dictionary, raw_output, active_provider.provider_name, model_name)
+    db.commit()
+    return ThemeDictionaryOut.model_validate(row)
+
+
+@router.post(
+    "/{theme_dictionary_id}/regenerate",
+    response_model=ThemeDictionaryOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def regenerate_theme(
+    theme_dictionary_id: uuid.UUID,
+    body: ThemeRegenerateRequest,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+    generator: TaxonomyThemeDictionaryGenerator = Depends(get_theme_generator),
+    provider: LLMProvider = Depends(get_llm_provider),
+) -> ThemeDictionaryOut:
+    repo = ThemeRepository(db)
+    previous = repo.get(theme_dictionary_id)
+    if previous is None or previous.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="theme dictionary not found")
+
+    prompt = body.theme.strip() if body.theme else previous.theme_name
+    try:
+        generated = generator.generate_profile_seeded(
+            prompt,
+            output_language="en",
             languages=("python",),
             clarifying_answers=body.clarifying_answers,
         )
@@ -56,21 +155,26 @@ def generate_theme(
         problems = getattr(exc, "problems", [str(exc)])
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"message": "theme dictionary could not be generated", "problems": problems},
+            detail={"message": "theme dictionary could not be regenerated", "problems": problems},
         ) from exc
     except LLMProviderError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail={
-                "message": "the LLM provider did not return a valid theme output",
-                "problems": [str(exc)],
-            },
+            detail={"message": "the LLM provider did not return a valid theme output", "problems": [str(exc)]},
         ) from exc
 
+    # Keep one version chain even when the model slightly reformats the label.
+    generated = replace(generated, theme=previous.theme_name)
+    raw_output = generated.profile.raw_model_output if generated.profile else ""
     model_name = getattr(provider, "model", provider.provider_name)
-    repo = ThemeRepository(db)
-    raw_output = dictionary.profile.raw_model_output if getattr(dictionary, "profile", None) else ""
-    row = repo.save(user_id, dictionary, raw_output, provider.provider_name, model_name)
+    row = repo.save(
+        user_id,
+        generated,
+        raw_output,
+        provider.provider_name,
+        model_name,
+    )
+    repo.deactivate(previous)
     db.commit()
     return ThemeDictionaryOut.model_validate(row)
 
@@ -80,23 +184,42 @@ def get_clarifying_questions(
     body: ClarifyingQuestionsRequest,
     user_id: uuid.UUID = Depends(get_current_user_id),
     provider: LLMProvider = Depends(get_llm_provider),
+    settings: Settings = Depends(get_settings),
 ) -> ClarifyingQuestionsOut:
-    try:
-        questions = generate_clarifying_questions(provider, body.theme)
-    except TaxonomyGenerationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"message": "clarifying questions could not be generated", "problems": [str(exc)]},
-        ) from exc
-    except LLMProviderError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail={
-                "message": "the LLM provider did not return valid clarifying questions",
-                "problems": [str(exc)],
-            },
-        ) from exc
+    active_provider = provider
+    if body.use_amd and settings.amd_enabled:
+        active_provider = build_amd_provider(settings)
 
+    try:
+        questions = generate_clarifying_questions(active_provider, body.theme)
+    except (TaxonomyGenerationError, LLMProviderError) as exc:
+        if active_provider is not provider:
+            # AMD failed — retry with the primary provider
+            try:
+                questions = generate_clarifying_questions(provider, body.theme)
+            except TaxonomyGenerationError as exc2:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "message": "clarifying questions could not be generated",
+                        "problems": [str(exc2)],
+                    },
+                ) from exc2
+            except LLMProviderError as exc2:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail={
+                        "message": "the LLM provider did not return valid clarifying questions",
+                        "problems": [str(exc2)],
+                    },
+                ) from exc2
+            return _questions_out(questions)
+        raise _questions_error(exc)
+
+    return _questions_out(questions)
+
+
+def _questions_out(questions) -> ClarifyingQuestionsOut:
     return ClarifyingQuestionsOut(
         questions=[
             ClarifyingQuestionOut(
@@ -106,6 +229,21 @@ def get_clarifying_questions(
             )
             for q in questions
         ]
+    )
+
+
+def _questions_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, LLMProviderError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                "message": "the LLM provider did not return valid clarifying questions",
+                "problems": [str(exc)],
+            },
+        )
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={"message": "clarifying questions could not be generated", "problems": [str(exc)]},
     )
 
 
@@ -210,12 +348,26 @@ def get_theme_dictionary_catalog(
     entries.sort(key=lambda entry: (entry.category, tier_order.get(entry.tier, 9), entry.python_name.casefold()))
     category_counts = Counter(entry.category for entry in entries)
     tier_counts = Counter(entry.tier for entry in entries)
+    quality = assess_dictionary_quality(row.mappings, row.rationale)
     return ThemeDictionaryCatalogOut(
         theme_dictionary_id=theme_dictionary_id,
         theme_name=row.theme_name,
         total=len(entries),
         category_counts=dict(sorted(category_counts.items())),
         tier_counts=dict(sorted(tier_counts.items())),
+        quality=ThemeDictionaryQualityOut(
+            overall_score=quality.overall_score,
+            grade=quality.grade,
+            brevity_score=quality.brevity_score,
+            uniqueness_score=quality.uniqueness_score,
+            diversity_score=quality.diversity_score,
+            semantic_score=quality.semantic_score,
+            max_token_length=quality.max_token_length,
+            max_token_parts=quality.max_token_parts,
+            dominant_root_share=quality.dominant_root_share,
+            upgrade_recommended=quality.upgrade_recommended,
+            issues=list(quality.issues),
+        ),
         entries=entries,
     )
 

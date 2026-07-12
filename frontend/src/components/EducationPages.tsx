@@ -12,6 +12,7 @@ import {
   Library,
   LockKeyhole,
   Play,
+  RefreshCw,
   Search,
   Sparkles,
   Target,
@@ -22,6 +23,7 @@ import {
 import {
   checkBridge,
   checkPracticeAnswer,
+  compileSource,
   getBridgeChallenge,
   getLearningLesson,
   getLearningPath,
@@ -29,6 +31,7 @@ import {
   getProgressProof,
   getThemeDictionaryCatalog,
   gradePractice,
+  regenerateTheme,
   runPracticeCode,
 } from '../lib/api';
 import type {
@@ -43,6 +46,7 @@ import type {
   PracticeRunResult,
   ProgressProof,
   ThemeDictionaryCatalog,
+  ThemeDictionary,
 } from '../lib/types';
 
 export type EducationView = 'learn' | 'lesson' | 'challenge' | 'graduation' | 'dictionary' | 'playground';
@@ -58,6 +62,7 @@ interface EducationPagesProps {
   theme: EducationTheme;
   token: string;
   onNavigate: (view: EducationView) => void;
+  onThemeRegenerated: (theme: ThemeDictionary) => void;
 }
 
 const realAmdCode = `from amd import RyzenAI
@@ -282,6 +287,11 @@ function LessonPage({ path, lesson, progress, onSelectModule, onStartPractice, o
           <div><h1>Lesson {String(lesson.order).padStart(2, '0')} - {lesson.title}</h1><p>{lesson.goal}</p></div>
           <div className="edu-lesson-progress"><span>Lesson {lesson.order} of {path.modules.length}</span><div><i style={{ width: `${Math.round((lesson.order / path.modules.length) * 100)}%` }} /></div><strong>{saved?.best_score || 0}%</strong><button onClick={() => goRelative(-1)} disabled={currentIndex <= 0}><ArrowLeft /></button><button onClick={() => goRelative(1)} disabled={currentIndex >= path.modules.length - 1}><ArrowRight /></button></div>
         </section>
+        <section className={`edu-scaffold-status ${lesson.scaffold_stage}`}>
+          <div><small>Learning stage</small><strong>{scaffoldStageLabel(lesson.scaffold_stage)}</strong><span>{lesson.practice_syntax === 'python' ? 'Practice uses standard Python' : 'Practice uses your personal syntax'}</span></div>
+          <div><small>Personal support</small><strong>{lesson.personal_support_percent}%</strong><div><i style={{ width: `${lesson.personal_support_percent}%` }} /></div></div>
+          <p>{scaffoldStageCopy(lesson.scaffold_stage)}</p>
+        </section>
 
         <div className="edu-lesson-layout">
           <aside className="edu-lesson-left">
@@ -344,6 +354,9 @@ function ChallengePage({ lesson, theme, token, onProgressChanged, onNavigate }: 
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [evaluations, setEvaluations] = useState<Record<string, PracticeEvaluation>>({});
   const [runResult, setRunResult] = useState<PracticeRunResult | null>(null);
+  const [compiledPreview, setCompiledPreview] = useState('');
+  const [previewStatus, setPreviewStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [previewMessage, setPreviewMessage] = useState('');
   const [mastery, setMastery] = useState<MasteryReport | null>(null);
   const [hintOpen, setHintOpen] = useState(false);
   const [running, setRunning] = useState(false);
@@ -355,7 +368,56 @@ function ChallengePage({ lesson, theme, token, onProgressChanged, onNavigate }: 
     setEvaluations({});
     setRunResult(null);
     setMastery(null);
+    setCompiledPreview('');
+    setPreviewStatus('loading');
+    setPreviewMessage('');
   }, [lesson.module_id, codeTask?.starter_source, lesson.source_content]);
+
+  useEffect(() => {
+    if (!source.trim()) {
+      setCompiledPreview('');
+      setPreviewStatus('error');
+      setPreviewMessage('Write Personal Python to generate its matching preview.');
+      return;
+    }
+
+    if (codeTask?.syntax_mode === 'python') {
+      setCompiledPreview(source);
+      setPreviewStatus('ready');
+      setPreviewMessage('This advanced exercise runs as standard Python without the personal compiler.');
+      return;
+    }
+
+    let cancelled = false;
+    setPreviewStatus('loading');
+    setPreviewMessage('Compiling the code on the left...');
+    const timeoutId = window.setTimeout(() => {
+      compileSource(token, source, theme.id)
+        .then((result) => {
+          if (cancelled) return;
+          if (result.success && result.generated_code) {
+            setCompiledPreview(result.generated_code);
+            setPreviewStatus('ready');
+            setPreviewMessage('Live preview of the current Personal Python source.');
+            return;
+          }
+          setCompiledPreview('');
+          setPreviewStatus('error');
+          setPreviewMessage(result.error?.themed_message || result.error?.message || 'The current source does not compile yet.');
+        })
+        .catch((reason: Error) => {
+          if (cancelled) return;
+          setCompiledPreview('');
+          setPreviewStatus('error');
+          setPreviewMessage(reason.message || 'Could not compile the current source.');
+        });
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [source, theme.id, token, codeTask?.syntax_mode]);
 
   const runCode = async () => {
     if (!codeTask || !source.trim()) return null;
@@ -386,9 +448,9 @@ function ChallengePage({ lesson, theme, token, onProgressChanged, onNavigate }: 
   };
 
   const tests = [
-    { label: 'Personal syntax compiles and runs', pass: runResult?.status === 'success' },
+    { label: codeTask?.syntax_mode === 'python' ? 'Standard Python runs' : 'Personal syntax compiles and runs', pass: runResult?.status === 'success' },
     { label: 'Program prints the target output', pass: Boolean(runResult?.correct) },
-    { label: 'Knowledge checks are correct', pass: knowledgeTasks.length === 0 || knowledgeTasks.every((task) => evaluations[task.id]?.correct) },
+    { label: codeTask?.syntax_mode === 'python' ? 'Personal scaffold is removed' : 'Knowledge checks are correct', pass: codeTask?.syntax_mode === 'python' ? runResult?.status === 'success' : knowledgeTasks.length === 0 || knowledgeTasks.every((task) => evaluations[task.id]?.correct) },
   ];
   const passed = tests.filter((test) => test.pass).length;
 
@@ -403,8 +465,8 @@ function ChallengePage({ lesson, theme, token, onProgressChanged, onNavigate }: 
           <section className="edu-challenge-main">
             <div className="edu-mission"><Dino /><div><h2>Your mission</h2><p>{codeTask?.prompt || lesson.goal}</p><span>Goal output: <code>{codeTask ? 'hidden until run' : lesson.expected_stdout.trim()}</code></span></div></div>
             <div className="edu-challenge-editor">
-              <div><header><strong>your personal syntax</strong><span>Edit and run through the real backend</span></header><textarea value={source} onChange={(event) => { setSource(event.target.value); setRunResult(null); }} spellCheck={false} /></div>
-              <div><header><strong>real python preview</strong><span>What the lesson compiles toward</span></header><pre>{lesson.real_python_preview}</pre></div>
+              <div><header><strong>{codeTask?.syntax_mode === 'python' ? 'standard python' : 'your personal syntax'}</strong><span>{codeTask?.syntax_mode === 'python' ? 'The scaffold is now removed' : 'Edit and run through the real backend'}</span></header><textarea value={source} onChange={(event) => { setSource(event.target.value); setRunResult(null); }} spellCheck={false} /></div>
+              <div><header><strong>matching real python</strong><span>{previewStatus === 'ready' ? 'Live from the code on the left' : 'Waiting for valid Personal Python'}</span></header><pre className={previewStatus === 'error' ? 'compile-preview-error' : ''}>{compiledPreview || previewMessage}</pre></div>
             </div>
             <p className="edu-stuck"><Sparkles /> This is not a visual simulation. Your code is compiled and executed by the learning API.</p>
 
@@ -432,7 +494,21 @@ function prettyCategory(value: string) {
   return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function DictionaryPage({ theme, token, onNavigate }: { theme: EducationTheme; token: string; onNavigate: (view: EducationView) => void }) {
+function scaffoldStageLabel(stage: LearningModule['scaffold_stage']) {
+  if (stage === 'personal') return 'Personal Foundation';
+  if (stage === 'bridge') return 'Concept Bridge';
+  if (stage === 'python_forward') return 'Python Forward';
+  return 'Real Python';
+}
+
+function scaffoldStageCopy(stage: LearningModule['scaffold_stage']) {
+  if (stage === 'personal') return 'Build the mental model with memorable personal cues while canonical Python stays visible.';
+  if (stage === 'bridge') return 'Compare both vocabularies and begin recalling the canonical Python names yourself.';
+  if (stage === 'python_forward') return 'Write standard Python in practice while personal tokens remain available only as reference.';
+  return 'Work directly in standard Python and prove that the temporary syntax layer is no longer required.';
+}
+
+function DictionaryPage({ theme, token, onNavigate, onThemeRegenerated }: { theme: EducationTheme; token: string; onNavigate: (view: EducationView) => void; onThemeRegenerated: (theme: ThemeDictionary) => void }) {
   const [catalog, setCatalog] = useState<ThemeDictionaryCatalog | null>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
@@ -440,6 +516,7 @@ function DictionaryPage({ theme, token, onNavigate }: { theme: EducationTheme; t
   const [visibleLimit, setVisibleLimit] = useState(DICTIONARY_BATCH_SIZE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [upgrading, setUpgrading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -470,6 +547,19 @@ function DictionaryPage({ theme, token, onNavigate }: { theme: EducationTheme; t
   const categories = catalog ? Object.entries(catalog.category_counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])) : [];
   const safeCount = catalog?.entries.filter((entry) => entry.sandbox_safe).length || 0;
 
+  const upgradeVocabulary = async () => {
+    setUpgrading(true);
+    setError('');
+    try {
+      const upgraded = await regenerateTheme(token, theme.id);
+      onThemeRegenerated(upgraded);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Vocabulary upgrade failed.');
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
   return (
     <div className="edu-page">
       <ProductHeader onNavigate={onNavigate} active="dictionary" />
@@ -481,6 +571,14 @@ function DictionaryPage({ theme, token, onNavigate }: { theme: EducationTheme; t
         </section>
 
         {loading ? <div className="edu-inline-loading"><div className="spinner" /> Loading the complete Python dictionary...</div> : error ? <div className="edu-inline-error">{error}</div> : catalog && <>
+          <section className="edu-quality-band">
+            <div className="edu-quality-score"><small>Vocabulary quality</small><strong>{catalog.quality.overall_score}</strong><span>Grade {catalog.quality.grade}</span></div>
+            <div><small>Brevity</small><strong>{catalog.quality.brevity_score}%</strong></div>
+            <div><small>Python meaning</small><strong>{catalog.quality.semantic_score}%</strong></div>
+            <div><small>Root diversity</small><strong>{catalog.quality.diversity_score}%</strong></div>
+            {catalog.quality.upgrade_recommended ? <button onClick={() => void upgradeVocabulary()} disabled={upgrading}><RefreshCw />{upgrading ? 'Upgrading...' : 'Upgrade vocabulary'}</button> : <span className="edu-quality-ready"><CheckCircle2 />Brain V2 ready</span>}
+          </section>
+          {catalog.quality.issues.length > 0 && <div className="edu-quality-issues">{catalog.quality.issues.join(' ')}</div>}
           <section className="edu-dictionary-stats">
             <div><small>Total mappings</small><strong>{catalog.total}</strong><span>Python only</span></div>
             <div><small>Categories</small><strong>{Object.keys(catalog.category_counts).length}</strong><span>Grouped for learning</span></div>
@@ -588,7 +686,7 @@ function GraduationPage({ theme, token, progress, onProgressChanged, onNavigate 
   );
 }
 
-export function EducationPages({ view, theme, token, onNavigate }: EducationPagesProps) {
+export function EducationPages({ view, theme, token, onNavigate, onThemeRegenerated }: EducationPagesProps) {
   const [path, setPath] = useState<LearningPath | null>(null);
   const [progress, setProgress] = useState<LearningProgress | null>(null);
   const [proof, setProof] = useState<ProgressProof | null>(null);
@@ -645,7 +743,7 @@ export function EducationPages({ view, theme, token, onNavigate }: EducationPage
     if (error) return <ErrorScreen message={error} onRetry={() => void loadOverview()} onNavigate={onNavigate} />;
     return <LoadingScreen onNavigate={onNavigate} />;
   }
-  if (view === 'dictionary') return <DictionaryPage theme={theme} token={token} onNavigate={onNavigate} />;
+  if (view === 'dictionary') return <DictionaryPage theme={theme} token={token} onNavigate={onNavigate} onThemeRegenerated={onThemeRegenerated} />;
   if (view === 'graduation') return <GraduationPage theme={theme} token={token} progress={progress} onProgressChanged={refreshProgress} onNavigate={onNavigate} />;
   if (view === 'lesson' || view === 'challenge') {
     if (lessonLoading || !lesson) return <LoadingScreen onNavigate={onNavigate} />;

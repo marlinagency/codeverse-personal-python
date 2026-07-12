@@ -752,6 +752,144 @@ def test_profile_seeded_dictionary_compiles_and_runs_personal_python_sample():
     assert stdout.getvalue() == "100\n100\n150\n"
 
 
+@pytest.mark.parametrize(
+    "prompt",
+    (
+        "SWAT Police Operations",
+        "I repair elevators and think in floors, cables, and safety checks",
+        "the quiet feeling of rain moving across a train window at night",
+        "I study marine biology, love coral reefs, and struggle with functions and loops",
+    ),
+)
+def test_profile_seeded_keeps_arbitrary_learning_tokens_compact(prompt):
+    provider = _StubProvider(["junk"] * 4)
+    dictionary = TaxonomyThemeDictionaryGenerator(provider).generate_profile_seeded(
+        prompt,
+        languages=("python",),
+    )
+
+    compact_ids = {
+        "py_kw_def", "py_kw_return", "py_fn_print", "py_fn_str",
+        "py_kw_if", "py_kw_elif", "py_kw_else", "py_kw_for",
+        "py_kw_while", "py_kw_break", "py_kw_continue",
+        "py_fn_list", "py_fn_dict", "py_fn_set", "py_fn_tuple",
+        "py_fn_open", "py_file_read", "py_file_write",
+    }
+    for concept_id in compact_ids:
+        token = dictionary.mappings[concept_id]
+        assert len(token) <= 16, (concept_id, token)
+        assert len(token.split("_")) <= 2, (concept_id, token)
+    for concept_id, token in dictionary.mappings.items():
+        assert len(token) <= 20, (concept_id, token)
+        assert len(token.split("_")) <= 2, (concept_id, token)
+
+
+def test_long_tail_builtins_stay_short_and_keep_python_behavior_cues():
+    names = ("bytearray", "bytes", "callable", "chr", "compile", "complex")
+    concepts = [
+        _concept(name, kind="builtin", category="builtin_functions", ids=(f"py_fn_{name}",))
+        for name in names
+    ]
+    profile = json.dumps(
+        {
+            "clean_theme": "Emergency Dispatch",
+            "learner_summary": "The learner thinks through dispatch operations.",
+            "primary_world": "Emergency Dispatch",
+            "motifs": ["patrol", "radio", "unit", "signal", "roster", "alert"],
+            "family_motifs": {
+                "condition": ["safety check"], "iteration": ["patrol route"],
+                "function": ["dispatch action"], "output": ["radio call"],
+                "data": ["unit roster"], "oop": ["unit role"],
+                "error": ["breach alert"], "general": ["command post"],
+            },
+            "domain_lexicon": {
+                "entities": ["unit", "officer"], "actions": ["dispatch", "patrol"],
+                "states": ["ready", "secure"], "containers": ["roster", "locker"],
+                "signals": ["radio", "alert"], "failures": ["breach", "jam"],
+                "results": ["clearance", "rescue"],
+            },
+            "tone": "direct", "output_language": "en",
+        }
+    )
+    dictionary = TaxonomyThemeDictionaryGenerator(_StubProvider([profile])).generate_profile_seeded(
+        "I work with emergency dispatch and want short meaningful Python words",
+        languages=("python",),
+        concepts=concepts,
+    )
+    cues = {
+        "bytearray": "mutable", "bytes": "packet", "callable": "ready",
+        "chr": "glyph", "compile": "build", "complex": "imaginary",
+    }
+    rationale_cues = {
+        "bytearray": "mutable sequence", "bytes": "immutable packet",
+        "callable": "can be called", "chr": "unicode number",
+        "compile": "source text", "complex": "imaginary parts",
+    }
+    for name, cue in cues.items():
+        token = dictionary.mappings[f"py_fn_{name}"]
+        assert len(token) <= 20, token
+        assert len(token.split("_")) <= 2, token
+        assert cue in token.split("_"), token
+        assert rationale_cues[name] in dictionary.rationale[f"py_fn_{name}"].casefold()
+    stems = {dictionary.mappings[f"py_fn_{name}"].split("_")[0] for name in names}
+    assert len(stems) >= 4
+
+
+def test_profile_seeded_routes_compact_lexicon_by_python_concept_family():
+    concepts = [
+        _concept("if", kind="keyword", category="keywords", ids=("py_kw_if",)),
+        _concept("for", kind="keyword", category="keywords", ids=("py_kw_for",)),
+        _concept("def", kind="keyword", category="keywords", ids=("py_kw_def",)),
+        _concept("print", kind="builtin", category="builtins", ids=("py_fn_print",)),
+        _concept("list", kind="builtin", category="builtins", ids=("py_fn_list",)),
+        _concept("try", kind="keyword", category="keywords", ids=("py_kw_try",)),
+    ]
+    profile = json.dumps(
+        {
+            "clean_theme": "Urban Emergency Response",
+            "learner_summary": "The learner thinks through coordinated emergency work.",
+            "primary_world": "Urban Emergency Response",
+            "motifs": ["unit", "dispatch", "ready", "roster", "alert", "breach"],
+            "family_motifs": {
+                "condition": ["safety check"],
+                "iteration": ["patrol route"],
+                "function": ["response plan"],
+                "output": ["radio call"],
+                "data": ["unit roster"],
+                "oop": ["team blueprint"],
+                "error": ["failed entry"],
+                "general": ["command post"],
+            },
+            "domain_lexicon": {
+                "entities": ["unit", "officer"],
+                "actions": ["dispatch", "patrol"],
+                "states": ["ready", "contained"],
+                "containers": ["roster", "locker"],
+                "signals": ["alert", "radio"],
+                "failures": ["breach", "timeout"],
+                "results": ["clearance", "rescue"],
+            },
+            "tone": "calm and precise",
+            "output_language": "en",
+        }
+    )
+    provider = _StubProvider([profile])
+
+    dictionary = TaxonomyThemeDictionaryGenerator(provider).generate_profile_seeded(
+        "I coordinate emergency teams and long Python names distract me",
+        languages=("python",),
+        concepts=concepts,
+    )
+
+    assert dictionary.mappings["py_kw_if"] in {"ready", "contained", "unit", "officer"}
+    assert dictionary.mappings["py_kw_for"] in {"dispatch", "patrol", "unit", "officer"}
+    assert dictionary.mappings["py_kw_def"] in {"dispatch", "patrol", "clearance", "rescue"}
+    assert dictionary.mappings["py_fn_print"] in {"alert", "radio", "clearance", "rescue"}
+    assert dictionary.mappings["py_fn_list"] in {"roster", "locker", "unit", "officer"}
+    assert dictionary.mappings["py_kw_try"] in {"breach", "timeout", "ready", "contained"}
+    assert all(len(token.split("_")) <= 2 for token in dictionary.mappings.values())
+
+
 def test_profile_seeded_repairs_generic_long_elif_for_cs2():
     concepts = [
         _concept("if", kind="keyword", category="keywords", ids=("py_kw_if",)),

@@ -8,6 +8,7 @@ import { RunButton } from '../components/RunButton';
 import { AnimatedLandingDemo, EducationPages, type EducationView } from '../components/EducationPages';
 import rocketImage from '../assets/codeverse-rocket.png';
 import { BASE_URL } from '../lib/api';
+import type { TranslationTraceLine } from '../lib/types';
 
 interface ThemeMapping {
   id: string;
@@ -345,6 +346,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
   const [selectedTheme, setSelectedTheme] = useState<ThemeMapping | null>(null);
   const [sourceCode, setSourceCode] = useState('');
   const [compiledCode, setCompiledCode] = useState('');
+  const [translationTrace, setTranslationTrace] = useState<TranslationTraceLine[]>([]);
   const [isCompiling, setIsCompiling] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [runResult, setRunResult] = useState<any | null>(null);
@@ -656,6 +658,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
 
     setIsCompiling(true);
     setRunResult(null);
+    setTranslationTrace([]);
     setActiveRightTab('output');
 
     try {
@@ -674,6 +677,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Compile failed.');
 
+      setTranslationTrace(data.translation_trace || []);
       if (data.success) {
         setCompiledCode(data.generated_code);
         setRunResult({
@@ -713,6 +717,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
 
     setIsRunning(true);
     setRunResult(null);
+    setTranslationTrace([]);
     setActiveRightTab('output');
 
     try {
@@ -742,6 +747,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
       }
 
       setRunResult(data);
+      setTranslationTrace(data.translation_trace || []);
       if (data.generated_code) setCompiledCode(data.generated_code);
     } catch (err: any) {
       setRunResult({
@@ -797,6 +803,14 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
         .map((key) => [key, selectedTheme.mappings[key]] as [string, string])
     : [];
 
+  const handleThemeRegenerated = (upgraded: ThemeMapping) => {
+    setThemes((current) => [
+      upgraded,
+      ...current.filter((item) => item.id !== upgraded.id && item.id !== selectedTheme?.id),
+    ]);
+    setSelectedTheme(upgraded);
+  };
+
   if (selectedTheme && productView !== 'playground') {
     return (
       <EducationPages
@@ -804,6 +818,10 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
         theme={selectedTheme}
         token={token}
         onNavigate={setProductView}
+        onThemeRegenerated={(upgraded) => handleThemeRegenerated({
+          ...upgraded,
+          rationale: upgraded.rationale ?? undefined,
+        })}
       />
     );
   }
@@ -1303,6 +1321,7 @@ export const EditorPage: React.FC<EditorPageProps> = ({ token, user }) => {
                     generatedCode={compiledCode}
                     language={selectedLanguage}
                     isLoading={isCompiling}
+                    trace={translationTrace}
                   />
                 </div>
                 <div className="flex-1.2 min-h-0 flex flex-col">

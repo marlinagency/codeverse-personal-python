@@ -1,17 +1,20 @@
 import React from 'react';
 import Editor from '@monaco-editor/react';
 import { Sparkles } from 'lucide-react';
+import type { TranslationTraceLine } from '../lib/types';
 
 interface TranslationPanelProps {
   generatedCode: string;
   language: 'python' | 'sql';
   isLoading: boolean;
+  trace: TranslationTraceLine[];
 }
 
 export const TranslationPanel: React.FC<TranslationPanelProps> = ({
   generatedCode,
   language,
   isLoading,
+  trace,
 }) => {
   return (
     <div className="translation-panel glass-panel overflow-hidden flex flex-col">
@@ -21,6 +24,22 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({
           Canonical translation ({language === 'python' ? 'Python' : 'PostgreSQL'})
         </span>
       </div>
+
+      {trace.length > 0 && (
+        <div className="translation-trace" aria-label="Personal Python translation trace">
+          <div className="translation-trace-title"><span>Python bridge</span><small>{trace.length} translated lines</small></div>
+          <div className="translation-trace-lines">
+            {trace.map((line) => (
+              <div className="translation-trace-line" key={`${line.line}-${line.personal_source}`}>
+                <span>{line.line}</span>
+                <code>{line.personal_source.trim()}</code>
+                <strong>-&gt;</strong>
+                <code>{line.python_source.trim()}</code>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 min-h-0 relative">
         {isLoading ? (

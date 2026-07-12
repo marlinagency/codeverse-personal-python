@@ -49,6 +49,7 @@ from codeverse_core.personal_python import (
     build_progress_proof,
     code_task_expected_stdout,
     code_task_module_id,
+    code_task_syntax_mode,
     diagnose_learning_prompt,
     evaluate_practice_answer,
     grade_practice_answers,
@@ -132,18 +133,41 @@ def run_practice_code(
             status_code=status.HTTP_404_NOT_FOUND, detail="unknown code practice task"
         )
 
-    try:
-        compiled = pipeline.compile(body.source_content, dictionary)
-    except CompilationError as exc:
-        first = exc.diagnostics[0]
-        message = first.themed_message or first.message
-        return PracticeRunOut(
-            correct=False,
-            status="compile_error",
-            expected_stdout=expected,
-            feedback=f"Your code didn't compile yet: {message}",
-            compile_error=f"line {first.line}: {first.message}",
+    syntax_mode = code_task_syntax_mode(dictionary, body.task_id) or "personal"
+    if syntax_mode == "python":
+        personal_tokens = sorted(
+            {
+                str(token)
+                for token in dictionary.mappings.values()
+                if str(token) and re.search(rf"\b{re.escape(str(token))}\b", body.source_content)
+            }
         )
+        if personal_tokens:
+            return PracticeRunOut(
+                correct=False,
+                status="used_personal_tokens",
+                expected_stdout=expected,
+                feedback=(
+                    "This module is Python Forward. Replace personal token(s) "
+                    + ", ".join(personal_tokens[:4])
+                    + " with standard Python syntax."
+                ),
+            )
+        source_code = body.source_content
+    else:
+        try:
+            compiled = pipeline.compile(body.source_content, dictionary)
+        except CompilationError as exc:
+            first = exc.diagnostics[0]
+            message = first.themed_message or first.message
+            return PracticeRunOut(
+                correct=False,
+                status="compile_error",
+                expected_stdout=expected,
+                feedback=f"Your code didn't compile yet: {message}",
+                compile_error=f"line {first.line}: {first.message}",
+            )
+        source_code = compiled.codegen.source_code
 
     limits = SandboxLimits()
     run: dict[str, object]
@@ -151,14 +175,14 @@ def run_practice_code(
         try:
             result = sandbox.run(
                 language="python",
-                source_code=compiled.codegen.source_code,
+                source_code=source_code,
                 limits=limits,
             )
             run = {"status": result.status, "stdout": result.stdout, "stderr_raw": result.stderr or None}
         except DockerSandboxError:
-            run = run_local_python_demo("python", compiled.codegen.source_code, limits)
+            run = run_local_python_demo("python", source_code, limits)
     else:
-        run = run_local_python_demo("python", compiled.codegen.source_code, limits)
+        run = run_local_python_demo("python", source_code, limits)
 
     stdout = str(run.get("stdout") or "")
     if run.get("status") != "success":
@@ -450,6 +474,9 @@ def _module_out(
         expected_stdout=module.expected_stdout,
         practice_tasks=[_task_out(task) for task in module.practice_tasks],
         order=module.order,
+        scaffold_stage=module.scaffold_stage,
+        personal_support_percent=module.personal_support_percent,
+        practice_syntax=module.practice_syntax,
         generated_code=generated_code,
         stdout=stdout,
         compile_error=compile_error,
@@ -477,6 +504,7 @@ def _task_out(task: PracticeTask) -> PracticeTaskOut:
         starter_source=task.starter_source,
         hint=task.hint,
         explanation=task.explanation,
+        syntax_mode=task.syntax_mode,
     )
 
 

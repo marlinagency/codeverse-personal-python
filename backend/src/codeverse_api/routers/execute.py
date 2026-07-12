@@ -13,10 +13,11 @@ from sqlalchemy.orm import Session
 
 from codeverse_api.dependencies import get_compilation_pipeline, get_db, get_sandbox_runner
 from codeverse_api.repositories.execution_repository import ExecutionRepository
-from codeverse_api.routers.compile import resolve_source_and_dictionary
-from codeverse_api.schemas.execution import ExecutionRunOut, ExecuteRequest
+from codeverse_api.routers.compile import diagnostic_out, resolve_source_and_dictionary, trace_out
+from codeverse_api.schemas.execution import DiagnosticOut, ExecutionRunOut, ExecuteRequest, TranslationTraceLineOut
 from codeverse_api.security.auth import get_current_user_id
 from codeverse_core.cvl.pipeline import CompilationError, CompilationPipeline
+from codeverse_core.cvl.translation_trace import build_translation_trace
 from codeverse_sandbox.docker_runner import (
     DockerSandboxImageMissing,
     DockerSandboxRunner,
@@ -36,6 +37,7 @@ def execute_source(
     sandbox: DockerSandboxRunner | None = Depends(get_sandbox_runner),
 ) -> ExecutionRunOut:
     source, dictionary = resolve_source_and_dictionary(db, user_id, body)
+    trace = build_translation_trace(source, dictionary)
     started_at = datetime.now(timezone.utc)
 
     try:
@@ -53,6 +55,8 @@ def execute_source(
             error_message_themed=first.themed_message,
             duration_ms=0,
             started_at=started_at,
+            translation_trace=trace_out(trace),
+            diagnostic_error=diagnostic_out(first, trace),
         )
 
     limits = SandboxLimits()
@@ -73,6 +77,7 @@ def execute_source(
             error_message_themed=None,
             duration_ms=local["duration_ms"],
             started_at=started_at,
+            translation_trace=trace_out(trace),
         )
 
     t0 = time.monotonic()
@@ -105,6 +110,7 @@ def execute_source(
         error_message_themed=None,
         duration_ms=duration_ms,
         started_at=started_at,
+        translation_trace=trace_out(trace),
     )
 
 
@@ -166,6 +172,8 @@ def _persist_or_synthesize(
     error_message_themed: str | None,
     duration_ms: int,
     started_at: datetime,
+    translation_trace: list[TranslationTraceLineOut] | None = None,
+    diagnostic_error: DiagnosticOut | None = None,
 ) -> ExecutionRunOut:
     if project_file_id is None:
         return ExecutionRunOut(
@@ -175,6 +183,9 @@ def _persist_or_synthesize(
             stderr_raw=stderr_raw,
             error_message_themed=error_message_themed,
             duration_ms=duration_ms,
+            generated_code=generated_code or None,
+            diagnostic_error=diagnostic_error,
+            translation_trace=translation_trace or [],
             created_at=datetime.now(timezone.utc),
         )
 
@@ -190,4 +201,10 @@ def _persist_or_synthesize(
         started_at=started_at,
     )
     db.commit()
-    return ExecutionRunOut.model_validate(run)
+    return ExecutionRunOut.model_validate(run).model_copy(
+        update={
+            "generated_code": generated_code or None,
+            "diagnostic_error": diagnostic_error,
+            "translation_trace": translation_trace or [],
+        }
+    )

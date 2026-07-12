@@ -201,6 +201,8 @@ class ThemeProfile:
     learning_pain_points: tuple[str, ...] = ()
     concept_preferences: dict[str, str] = field(default_factory=dict)
     family_motifs: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    domain_lexicon: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    domain_lexicon_source: str = ""
     #: "llm" = the model really produced this profile; "fallback" = the
     #: deterministic backup built it because every LLM attempt failed.
     #: Downstream token generation trusts the LLM profile as the single
@@ -213,6 +215,11 @@ class ThemeProfile:
             for family, motifs in self.family_motifs.items()
             if motifs
         )
+        lexicon_lines = "; ".join(
+            f"{category}={', '.join(words)}"
+            for category, words in self.domain_lexicon.items()
+            if words
+        )
         return (
             f"Theme: {self.theme}\n"
             f"Clean theme: {self.clean_theme or self.theme}\n"
@@ -221,6 +228,7 @@ class ThemeProfile:
             f"Motifs: {', '.join(self.motifs)}\n"
             f"Learning pain points: {', '.join(self.learning_pain_points) or 'not specified'}\n"
             f"Family motifs: {family_lines or 'not specified'}\n"
+            f"Compact domain lexicon: {lexicon_lines or 'not specified'}\n"
             f"Tone: {self.tone}\n"
             f"Token language: {self.output_language}"
         )
@@ -267,7 +275,15 @@ Produce:
   {"condition": ["taste check", "heat level"], "iteration": ["prep line"],
    "function": ["recipe method"], "output": ["order call"],
    "data": ["recipe card"], "oop": ["dish blueprint"],
-   "error": ["burnt pan"], "general": ["kitchen station"]}.
+  "error": ["burnt pan"], "general": ["kitchen station"]}.
+- "domain_lexicon": a compact semantic vocabulary with EXACTLY these keys:
+  entities, actions, states, containers, signals, failures, results. Give
+  4-8 distinct English entries per key. Each entry must be one word when
+  possible and never more than two short words. Use concrete full words from
+  the user's world, not abbreviations, Python terms, generic programming
+  words, or pieces of the learner's raw sentence. This lexicon is the source
+  material for short identifiers, so prefer "patrol", "dispatch", "alert",
+  "roster" over phrases such as "police_operations_dispatch_protocol".
 - "tone": one short phrase describing the voice (e.g. "tactical and terse",
   "cosmic and awed").
 - "output_language": the language the themed tokens should be written in.
@@ -282,6 +298,9 @@ Respond with ONLY a JSON object:
  "family_motifs": {"condition": ["..."], "iteration": ["..."],
   "function": ["..."], "output": ["..."], "data": ["..."],
   "oop": ["..."], "error": ["..."], "general": ["..."]},
+ "domain_lexicon": {"entities": ["..."], "actions": ["..."],
+  "states": ["..."], "containers": ["..."], "signals": ["..."],
+  "failures": ["..."], "results": ["..."]},
  "tone": "...", "output_language": "..."}
 """
 
@@ -311,6 +330,15 @@ _PROFILE_FEW_SHOT_ASSISTANT = json.dumps(
             "oop": ["agent blueprint", "squad role"],
             "error": ["failed clutch", "missed smoke"],
             "general": ["site", "spike"],
+        },
+        "domain_lexicon": {
+            "entities": ["agent", "spike", "site", "squad"],
+            "actions": ["rotate", "defuse", "peek", "clutch"],
+            "states": ["ready", "planted", "clear", "contested"],
+            "containers": ["loadout", "roster", "inventory", "buy menu"],
+            "signals": ["callout", "ping", "alert", "radio"],
+            "failures": ["miss", "jam", "loss", "timeout"],
+            "results": ["win", "save", "score", "payout"],
         },
         "tone": "tactical and terse",
         "output_language": "en",
@@ -355,6 +383,15 @@ _PROFILE_FEW_SHOT_ASSISTANT_2 = json.dumps(
             "error": ["pressure leak", "lost signal", "engine flood"],
             "general": ["airlock", "deep trench"],
         },
+        "domain_lexicon": {
+            "entities": ["submarine", "reef", "trench", "crew"],
+            "actions": ["dive", "scan", "surface", "salvage"],
+            "states": ["sealed", "deep", "stable", "pressurized"],
+            "containers": ["logbook", "cargo", "chart", "airlock"],
+            "signals": ["sonar", "beacon", "ping", "radio"],
+            "failures": ["leak", "flood", "drift", "blackout"],
+            "results": ["discovery", "sample", "recovery", "report"],
+        },
         "tone": "calm and exploratory",
         "output_language": "en",
     },
@@ -395,6 +432,7 @@ def parse_theme_profile_output(raw: str, theme: str) -> ThemeProfile:
     if not isinstance(concept_preferences, dict):
         concept_preferences = {}
     family_motifs = _parse_family_motifs(data.get("family_motifs"))
+    domain_lexicon = _parse_domain_lexicon(data.get("domain_lexicon"))
     return ThemeProfile(
         theme=theme,
         motifs=tuple(str(m).strip() for m in motifs if str(m).strip()),
@@ -413,6 +451,8 @@ def parse_theme_profile_output(raw: str, theme: str) -> ThemeProfile:
             if str(key).strip() and str(value).strip()
         },
         family_motifs=family_motifs,
+        domain_lexicon=domain_lexicon,
+        domain_lexicon_source="llm" if domain_lexicon else "",
     )
 
 
@@ -464,6 +504,48 @@ def _parse_family_motifs(raw: object) -> dict[str, tuple[str, ...]]:
         )
         if motifs:
             parsed[family] = motifs
+    return parsed
+
+
+_DOMAIN_LEXICON_CATEGORIES = (
+    "entities",
+    "actions",
+    "states",
+    "containers",
+    "signals",
+    "failures",
+    "results",
+)
+
+
+def _parse_domain_lexicon(raw: object) -> dict[str, tuple[str, ...]]:
+    """Normalize model vocabulary without trusting schema length support."""
+    if not isinstance(raw, dict):
+        return {}
+
+    parsed: dict[str, tuple[str, ...]] = {}
+    for category in _DOMAIN_LEXICON_CATEGORIES:
+        value = raw.get(category)
+        if not isinstance(value, list):
+            continue
+        words: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            word = " ".join(str(item).strip().split())
+            folded = word.casefold()
+            if (
+                not word
+                or len(word) > 24
+                or len(word.split()) > 2
+                or folded in seen
+            ):
+                continue
+            words.append(word)
+            seen.add(folded)
+            if len(words) == 8:
+                break
+        if words:
+            parsed[category] = tuple(words)
     return parsed
 
 
@@ -602,4 +684,3 @@ def parse_category_mapping_output(
 # lives in json_extraction.py so clarifying_questions.py can reuse it too
 # without duplicating the fence-stripping/brace-scanning logic.
 _extract_json_object = extract_json_object
-

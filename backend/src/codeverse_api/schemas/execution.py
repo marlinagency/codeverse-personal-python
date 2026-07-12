@@ -25,6 +25,23 @@ class DiagnosticOut(BaseModel):
     col: int
     severity: str
     stage: str
+    personal_source: str | None = None
+    python_source: str | None = None
+    personal_token: str | None = None
+    python_token: str | None = None
+
+
+class TokenReplacementOut(BaseModel):
+    personal_token: str
+    python_token: str
+    col: int
+
+
+class TranslationTraceLineOut(BaseModel):
+    line: int
+    personal_source: str
+    python_source: str
+    replacements: list[TokenReplacementOut] = Field(default_factory=list)
 
 
 class CompileResult(BaseModel):
@@ -33,6 +50,7 @@ class CompileResult(BaseModel):
     target_language: str | None = None
     warnings: list[DiagnosticOut] = Field(default_factory=list)
     error: DiagnosticOut | None = None
+    translation_trace: list[TranslationTraceLineOut] = Field(default_factory=list)
 
 
 class ExecuteRequest(CompileRequest):
@@ -46,6 +64,9 @@ class ExecutionRunOut(BaseModel):
     stderr_raw: str | None = None
     error_message_themed: str | None = None
     duration_ms: int | None = None
+    generated_code: str | None = None
+    diagnostic_error: DiagnosticOut | None = None
+    translation_trace: list[TranslationTraceLineOut] = Field(default_factory=list)
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -25,6 +25,8 @@ from codeverse_api.dependencies import get_llm_provider
 from codeverse_api.main import create_app
 from codeverse_api.security.auth import create_access_token
 from codeverse_api.config import get_settings
+from codeverse_core.personal_python import code_task_reference_solution
+from codeverse_core.theme_mapping.generator import TaxonomyThemeDictionary
 from codeverse_core.theme_mapping.providers.fake import FakeProvider
 
 
@@ -184,6 +186,9 @@ def test_theme_dictionary_catalog_enriches_every_python_mapping(client: TestClie
     assert body["total"] == expected_count
     assert len(body["entries"]) == expected_count
     assert not any(entry["concept_id"].startswith("sql_") for entry in body["entries"])
+    assert 0 <= body["quality"]["overall_score"] <= 100
+    assert body["quality"]["grade"] in {"A", "B", "C", "D", "F"}
+    assert body["quality"]["max_token_parts"] <= 2
 
     upper = next(entry for entry in body["entries"] if entry["concept_id"] == "py_str_upper")
     assert upper["personal_token"] == created["mappings"]["py_str_upper"]
@@ -191,6 +196,28 @@ def test_theme_dictionary_catalog_enriches_every_python_mapping(client: TestClie
     assert upper["tier"] == "method"
     assert upper["python_name"]
     assert upper["real_syntax"]
+
+
+def test_regenerate_theme_creates_new_active_brain_v2_version(client: TestClient):
+    headers = _auth(client)
+    previous = _make_theme(client, headers, "I want SWAT in America")
+
+    response = client.post(
+        f"/themes/{previous['id']}/regenerate",
+        json={"theme": "American SWAT dispatch, patrol teams, secure entry and unit rosters"},
+        headers=headers,
+    )
+
+    assert response.status_code == 201, response.text
+    current = response.json()
+    assert current["id"] != previous["id"]
+    assert current["theme_name"] == previous["theme_name"]
+    assert current["version"] == previous["version"] + 1
+    assert all(len(token.split("_")) <= 2 for token in current["mappings"].values())
+
+    listing = client.get("/themes", headers=headers).json()
+    assert any(theme["id"] == current["id"] for theme in listing)
+    assert not any(theme["id"] == previous["id"] for theme in listing)
 
 
 def test_get_missing_theme_returns_404(client: TestClient):
@@ -263,9 +290,33 @@ def test_learning_diagnose_path_lesson_practice_and_proof(client: TestClient):
     path_body = path.json()
     assert path_body["title"].startswith("Personal Python Path")
     assert len(path_body["modules"]) >= 6
+    assert [module["scaffold_stage"] for module in path_body["modules"][:4]] == ["personal"] * 4
+    assert [module["scaffold_stage"] for module in path_body["modules"][4:8]] == ["bridge"] * 4
+    assert all(module["practice_syntax"] == "python" for module in path_body["modules"][8:])
     assert path_body["modules"][0]["module_id"] == "signals-and-values"
     assert len(path_body["modules"][0]["lesson_sections"]) == 4
     assert len(path_body["modules"][0]["practice_tasks"]) == 6
+    strings_module = next(module for module in path_body["modules"] if module["module_id"] == "strings-and-text")
+    assert len(strings_module["lesson_sections"]) == 5
+    assert len(strings_module["practice_tasks"]) == 6
+    numbers_module = next(module for module in path_body["modules"] if module["module_id"] == "numbers-and-conversion")
+    assert len(numbers_module["lesson_sections"]) == 5
+    assert len(numbers_module["practice_tasks"]) == 6
+    imports_module = next(module for module in path_body["modules"] if module["module_id"] == "imports-and-library")
+    assert len(imports_module["lesson_sections"]) == 4
+    assert len(imports_module["practice_tasks"]) == 6
+    choices_module = next(module for module in path_body["modules"] if module["module_id"] == "choices")
+    assert len(choices_module["lesson_sections"]) == 5
+    assert len(choices_module["practice_tasks"]) == 6
+    routes_module = next(module for module in path_body["modules"] if module["module_id"] == "routes")
+    assert len(routes_module["lesson_sections"]) == 5
+    assert len(routes_module["practice_tasks"]) == 6
+    loop_control_module = next(module for module in path_body["modules"] if module["module_id"] == "loop-control")
+    assert len(loop_control_module["lesson_sections"]) == 5
+    assert len(loop_control_module["practice_tasks"]) == 6
+    tools_module = next(module for module in path_body["modules"] if module["module_id"] == "tools")
+    assert len(tools_module["lesson_sections"]) == 5
+    assert len(tools_module["practice_tasks"]) == 6
 
     lesson = client.get(f"/learning/{created['id']}/lessons/routes", headers=headers)
     assert lesson.status_code == 200, lesson.text
@@ -301,6 +352,43 @@ def test_learning_diagnose_path_lesson_practice_and_proof(client: TestClient):
     assert proof.status_code == 200, proof.text
     assert proof.json()["total_modules"] >= 9
     assert "routes" in proof.json()["concept_coverage"]
+
+
+def test_python_forward_practice_runs_plain_python_and_rejects_personal_tokens(
+    client: TestClient,
+):
+    headers = _auth(client)
+    created = _make_theme(client, headers, "I want to learn standard Python gradually")
+    path = client.get(f"/learning/{created['id']}/path", headers=headers).json()
+    advanced = path["modules"][8]
+    task = next(item for item in advanced["practice_tasks"] if item["kind"] == "write_code")
+    assert task["syntax_mode"] == "python"
+    assert not task["starter_source"].startswith("@theme:")
+
+    dictionary = TaxonomyThemeDictionary(
+        theme=created["theme_name"],
+        mappings=created["mappings"],
+        rationale=created.get("rationale") or {},
+    )
+    solution = code_task_reference_solution(dictionary, task["id"])
+    assert solution
+    passed = client.post(
+        f"/learning/{created['id']}/practice/run",
+        json={"task_id": task["id"], "source_content": solution},
+        headers=headers,
+    )
+    assert passed.status_code == 200, passed.text
+    assert passed.json()["correct"] is True
+
+    personal_print = created["mappings"]["py_fn_print"]
+    scaffolded = solution.replace("print", personal_print, 1)
+    rejected = client.post(
+        f"/learning/{created['id']}/practice/run",
+        json={"task_id": task["id"], "source_content": scaffolded},
+        headers=headers,
+    )
+    assert rejected.status_code == 200
+    assert rejected.json()["status"] == "used_personal_tokens"
 
 
 def test_practice_tasks_do_not_leak_expected_answer(client: TestClient):
@@ -624,6 +712,10 @@ def test_compile_ad_hoc_source_succeeds(client: TestClient):
     assert body["target_language"] == "python"
     assert "def run():" in body["generated_code"]
     assert "print(42)" in body["generated_code"]
+    assert len(body["translation_trace"]) == 2
+    assert body["translation_trace"][0]["personal_source"].strip().endswith("run():")
+    assert body["translation_trace"][0]["python_source"].strip() == "def run():"
+    assert body["translation_trace"][0]["replacements"][0]["python_token"] == "def"
 
 
 def test_compile_reports_parse_error(client: TestClient):
@@ -641,6 +733,31 @@ def test_compile_reports_parse_error(client: TestClient):
     body = resp.json()
     assert body["success"] is False
     assert body["error"] is not None
+
+
+def test_compile_error_includes_personal_and_python_line_context(client: TestClient):
+    headers = _auth(client)
+    theme = _make_theme(client, headers)
+    personal_def = theme["mappings"]["py_kw_def"]
+    bad_source = (
+        "@theme: t\n@language: python\n@version: 1\n---\n"
+        f"{personal_def} broken()\n"
+    )
+
+    body = client.post(
+        "/compile",
+        json={"source_content": bad_source, "theme_dictionary_id": theme["id"]},
+        headers=headers,
+    ).json()
+
+    assert body["success"] is False
+    assert body["error"]["personal_source"] == f"{personal_def} broken()"
+    assert body["error"]["python_source"] == "def broken()"
+    assert body["translation_trace"][0]["replacements"][0] == {
+        "personal_token": personal_def,
+        "python_token": "def",
+        "col": 1,
+    }
 
 
 def test_compile_requires_source_or_file(client: TestClient):
@@ -670,6 +787,8 @@ def test_execute_runs_compiled_python_locally(client: TestClient):
     body = resp.json()
     assert body["status"] == "success"
     assert (body["stdout"] or "").strip() == "42"
+    assert "def run():" in body["generated_code"]
+    assert body["translation_trace"]
 
 
 def test_health_endpoint(client: TestClient):

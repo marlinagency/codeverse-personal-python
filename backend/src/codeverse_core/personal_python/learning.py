@@ -47,6 +47,7 @@ class PracticeTask:
     starter_source: str | None = None
     hint: str = ""
     explanation: str = ""
+    syntax_mode: str = "personal"  # personal | python
 
 
 @dataclass(frozen=True)
@@ -78,6 +79,9 @@ class LearningModule:
     expected_stdout: str
     practice_tasks: tuple[PracticeTask, ...]
     order: int
+    scaffold_stage: str
+    personal_support_percent: int
+    practice_syntax: str
 
 
 @dataclass(frozen=True)
@@ -541,6 +545,7 @@ def _build_module(dictionary: Any, blueprint: dict[str, Any], order: int) -> Lea
     concept_ids = tuple(blueprint["concept_ids"])
     concepts = tuple(_concept(dictionary, concept_id) for concept_id in concept_ids)
     module_id = str(blueprint["module_id"])
+    scaffold_stage, support_percent, practice_syntax = _scaffold_for_order(order)
     return LearningModule(
         module_id=module_id,
         title=str(blueprint["title"]),
@@ -556,9 +561,26 @@ def _build_module(dictionary: Any, blueprint: dict[str, Any], order: int) -> Lea
         real_python_preview=_real_python_preview(module_id),
         expected_stdout=_expected_stdout(module_id),
         practice_tasks=_module_tasks(module_id, dictionary)
-        + tuple(task for task in (_code_task(dictionary, module_id),) if task is not None),
+        + tuple(
+            task
+            for task in (_code_task(dictionary, module_id, practice_syntax),)
+            if task is not None
+        ),
         order=order,
+        scaffold_stage=scaffold_stage,
+        personal_support_percent=support_percent,
+        practice_syntax=practice_syntax,
     )
+
+
+def _scaffold_for_order(order: int) -> tuple[str, int, str]:
+    if order <= 4:
+        return "personal", 100, "personal"
+    if order <= 8:
+        return "bridge", 70, "personal"
+    if order <= 11:
+        return "python_forward", 35, "python"
+    return "real_python", 0, "python"
 
 
 def _concept(dictionary: Any, concept_id: str) -> LearningConcept:
@@ -790,6 +812,36 @@ def _module_tasks(module_id: str, dictionary: Any) -> tuple[PracticeTask, ...]:
                 hint="This method creates the all-capitals version of a string.",
                 explanation="str.upper returns a new uppercase string; it does not mutate the original.",
             ),
+            PracticeTask(
+                id="strings-immutable-original",
+                kind="predict_output",
+                concept_id="py_str_upper",
+                prompt='After cv_text = "code" and cv_text.upper() without assignment, what is cv_text?',
+                expected_answer="code",
+                choices=("code", "CODE", "Code"),
+                hint="The method returns a new string; its result was not assigned.",
+                explanation="Strings are immutable, so calling upper does not replace the value stored in cv_text.",
+            ),
+            PracticeTask(
+                id="strings-replace-output",
+                kind="predict_output",
+                concept_id="py_str_replace",
+                prompt='What does "red,blue".replace(",", "-") produce?',
+                expected_answer="red-blue",
+                choices=("red-blue", "red,blue", "red blue"),
+                hint="Only the comma is replaced by the requested hyphen.",
+                explanation="replace returns a new string with matching text substituted.",
+            ),
+            PracticeTask(
+                id="strings-split-result",
+                kind="concept_reasoning",
+                concept_id="py_str_split",
+                prompt='What kind of value does "learn real python".split() return?',
+                expected_answer="a list of strings",
+                choices=("a list of strings", "one modified string", "a number"),
+                hint="The sentence becomes three separately addressable pieces.",
+                explanation="split returns a list whose items are strings.",
+            ),
         )
     if module_id == "numbers-and-conversion":
         return (
@@ -812,6 +864,36 @@ def _module_tasks(module_id: str, dictionary: Any) -> tuple[PracticeTask, ...]:
                 choices=("8", "-8", "0"),
                 hint="Absolute value is the distance from zero.",
                 explanation="The distance between -8 and zero is 8.",
+            ),
+            PracticeTask(
+                id="numbers-float-arithmetic",
+                kind="predict_output",
+                concept_id="py_fn_float",
+                prompt='What does float("2.5") * 2 produce?',
+                expected_answer="5.0",
+                choices=("5.0", "2.52", "5"),
+                hint="The converted value is a float, so the multiplication result remains a float.",
+                explanation="2.5 multiplied by 2 is represented as the floating-point value 5.0.",
+            ),
+            PracticeTask(
+                id="numbers-round-precision",
+                kind="predict_output",
+                concept_id="py_fn_round",
+                prompt="What does round(3.14159, 2) return?",
+                expected_answer="3.14",
+                choices=("3.14", "3.1", "4"),
+                hint="The second argument requests two digits after the decimal point.",
+                explanation="Rounding 3.14159 to two decimal places produces 3.14.",
+            ),
+            PracticeTask(
+                id="numbers-power-result",
+                kind="predict_output",
+                concept_id="py_fn_pow",
+                prompt="What does pow(2, 5) return?",
+                expected_answer="32",
+                choices=("32", "10", "25"),
+                hint="Multiply five factors of 2.",
+                explanation="2 raised to the fifth power is 32.",
             ),
         )
     if module_id == "imports-and-library":
@@ -836,6 +918,36 @@ def _module_tasks(module_id: str, dictionary: Any) -> tuple[PracticeTask, ...]:
                 hint="The statement selects one named member.",
                 explanation="from-import binds the selected member directly in the current module.",
             ),
+            PracticeTask(
+                id="imports-direct-namespace",
+                kind="concept_reasoning",
+                concept_id="py_kw_import",
+                prompt="After import math, which expression calls square root?",
+                expected_answer="math.sqrt",
+                choices=("math.sqrt", "sqrt.math", "sqrt only"),
+                hint="A plain module import keeps its members behind the module namespace.",
+                explanation="Use the imported module name, a dot, and then the selected member.",
+            ),
+            PracticeTask(
+                id="imports-ceil-result",
+                kind="predict_output",
+                concept_id="py_kw_from",
+                prompt="What does ceil(4.2) return after importing ceil from math?",
+                expected_answer="5",
+                choices=("5", "4", "4.2"),
+                hint="ceil moves upward to the next integer boundary.",
+                explanation="The smallest integer greater than or equal to 4.2 is 5.",
+            ),
+            PracticeTask(
+                id="imports-selected-alias",
+                kind="concept_reasoning",
+                concept_id="py_kw_as",
+                prompt="After from statistics import mean as cv_average, which name do you call?",
+                expected_answer="cv_average",
+                choices=("cv_average", "mean", "statistics.mean"),
+                hint="The alias becomes the local callable name.",
+                explanation="as binds the selected function to cv_average in the current scope.",
+            ),
         )
     if module_id == "choices":
         return (
@@ -859,6 +971,36 @@ def _module_tasks(module_id: str, dictionary: Any) -> tuple[PracticeTask, ...]:
                 hint="Python starts at the top of the chain.",
                 explanation="The first if condition decides whether later branches are needed.",
             ),
+            PracticeTask(
+                id="choices-equality-operator",
+                kind="concept_reasoning",
+                concept_id="py_kw_if",
+                prompt="Which operator checks whether two values are equal inside a condition?",
+                expected_answer="==",
+                choices=("==", "=", ">="),
+                hint="One equals sign assigns; two equals signs compare.",
+                explanation="Python uses == for equality comparison and = for assignment.",
+            ),
+            PracticeTask(
+                id="choices-first-match",
+                kind="predict_branch",
+                concept_id="py_kw_elif",
+                prompt="With score 95, if score >= 50 prints pass before elif score >= 90. What prints?",
+                expected_answer="pass",
+                choices=("pass", "excellent", "pass and excellent"),
+                hint="The chain stops as soon as one branch succeeds.",
+                explanation="The broad first condition is true, so the later elif is never evaluated.",
+            ),
+            PracticeTask(
+                id="choices-indentation-scope",
+                kind="concept_reasoning",
+                concept_id="py_kw_if",
+                prompt="What tells Python that a statement belongs inside an if block?",
+                expected_answer="indentation",
+                choices=("indentation", "quotation marks", "a second equals sign"),
+                hint="Look at the horizontal spacing before the controlled statement.",
+                explanation="Python uses indentation as part of its block syntax.",
+            ),
         )
     if module_id == "routes":
         return (
@@ -880,6 +1022,36 @@ def _module_tasks(module_id: str, dictionary: Any) -> tuple[PracticeTask, ...]:
                 hint="This token starts the repeated route.",
                 explanation="for repeats a block for each item in a sequence.",
             ),
+            PracticeTask(
+                id="routes-start-stop-values",
+                kind="predict_output",
+                concept_id="py_fn_range",
+                prompt="Which values does range(2, 5) produce?",
+                expected_answer="2 3 4",
+                choices=("2 3 4", "2 3 4 5", "0 1 2 3 4"),
+                hint="The start is included and the stop is excluded.",
+                explanation="range(2, 5) yields 2, 3, and 4.",
+            ),
+            PracticeTask(
+                id="routes-step-values",
+                kind="predict_output",
+                concept_id="py_fn_range",
+                prompt="Which values does range(1, 8, 2) produce?",
+                expected_answer="1 3 5 7",
+                choices=("1 3 5 7", "1 2 3 4 5 6 7", "1 3 5 7 9"),
+                hint="Begin at 1, add 2 each time, and stop before 8.",
+                explanation="The step visits the odd values below the exclusive stop.",
+            ),
+            PracticeTask(
+                id="routes-accumulator-total",
+                kind="predict_output",
+                concept_id="py_kw_for",
+                prompt="Starting from 0, what total results from adding range(1, 4) in a loop?",
+                expected_answer="6",
+                choices=("6", "10", "3"),
+                hint="Add 1, then 2, then 3.",
+                explanation="The accumulator becomes 1, then 3, then 6.",
+            ),
         )
     if module_id == "loop-control":
         return (
@@ -892,6 +1064,46 @@ def _module_tasks(module_id: str, dictionary: Any) -> tuple[PracticeTask, ...]:
                 choices=("1 2 3", "1 3", "1 3 4"),
                 hint="2 is skipped by continue, 4 stops the loop before printing.",
                 explanation="continue skips the current turn; break exits the loop.",
+            ),
+            PracticeTask(
+                id="loop-control-while-count",
+                kind="predict_output",
+                concept_id="py_kw_while",
+                prompt="Starting at 0 and adding 1 while the value is below 3, which values print?",
+                expected_answer="1 2 3",
+                choices=("1 2 3", "0 1 2", "1 2 3 4"),
+                hint="The increment happens before each print.",
+                explanation="The state becomes 1, 2, and 3; then the condition becomes false.",
+            ),
+            PracticeTask(
+                id="loop-control-break-output",
+                kind="predict_output",
+                concept_id="py_kw_break",
+                prompt="If a loop breaks when cv_step reaches 3 before printing, which values print first?",
+                expected_answer="1 2",
+                choices=("1 2", "1 2 3", "3 only"),
+                hint="The break runs before the print for value 3.",
+                explanation="Values 1 and 2 print; break prevents 3 and all later values from printing.",
+            ),
+            PracticeTask(
+                id="loop-control-safe-progress",
+                kind="concept_reasoning",
+                concept_id="py_kw_while",
+                prompt="What must usually change inside a while loop to prevent accidental infinite repetition?",
+                expected_answer="the condition state",
+                choices=("the condition state", "the printed text", "the filename"),
+                hint="The condition needs a path from true to false.",
+                explanation="Updating the values used by the condition lets the loop progress toward termination.",
+            ),
+            PracticeTask(
+                id="loop-control-continue-effect",
+                kind="concept_reasoning",
+                concept_id="py_kw_continue",
+                prompt="What does continue skip?",
+                expected_answer="the rest of the current iteration",
+                choices=("the rest of the current iteration", "every future iteration", "the loop condition forever"),
+                hint="The loop itself remains active.",
+                explanation="continue returns control to the next condition check without finishing this iteration.",
             ),
         )
     if module_id == "tools":
@@ -913,6 +1125,36 @@ def _module_tasks(module_id: str, dictionary: Any) -> tuple[PracticeTask, ...]:
                 expected_answer="def",
                 hint="This token names a reusable tool.",
                 explanation="def creates a named function in real Python.",
+            ),
+            PracticeTask(
+                id="tools-definition-execution",
+                kind="concept_reasoning",
+                concept_id="py_kw_def",
+                prompt="When does a newly defined function body normally run?",
+                expected_answer="when the function is called",
+                choices=("when the function is called", "immediately at definition", "when a variable is assigned"),
+                hint="A definition creates the reusable tool; parentheses use it.",
+                explanation="Python stores the function at definition time and enters its body on a call.",
+            ),
+            PracticeTask(
+                id="tools-parameter-argument",
+                kind="concept_reasoning",
+                concept_id="py_kw_def",
+                prompt="In cv_double(4), what is the value 4?",
+                expected_answer="an argument",
+                choices=("an argument", "a parameter definition", "a return statement"),
+                hint="It is the concrete value supplied at the call site.",
+                explanation="The call supplies argument 4 to the function's parameter.",
+            ),
+            PracticeTask(
+                id="tools-early-return-output",
+                kind="predict_output",
+                concept_id="py_kw_return",
+                prompt='A function returns "denied" when age is below 18. What does it return for age 16?',
+                expected_answer="denied",
+                choices=("denied", "allowed", "None"),
+                hint="The guard condition succeeds and returns immediately.",
+                explanation="The early return ends the call before the allowed path is reached.",
             ),
         )
     if module_id == "logic":
@@ -1293,13 +1535,15 @@ _CODE_TASK_SPECS: dict[str, dict[str, Any]] = {
         "starter": lambda t: (
             f'{t["py_kw_class"]} CvTool:\n'
             '    name = "starter"\n\n'
-            'cv_tool = CvTool("hammer")\n'
+            'cv_tool = CvTool()\n'
+            'cv_tool.name = "hammer"\n'
             "# TODO: print cv_tool.name\n"
         ),
         "solution": lambda t: (
             f'{t["py_kw_class"]} CvTool:\n'
             '    name = "starter"\n\n'
-            'cv_tool = CvTool("hammer")\n'
+            'cv_tool = CvTool()\n'
+            'cv_tool.name = "hammer"\n'
             f'{t["py_fn_print"]}(cv_tool.name)\n'
         ),
     },
@@ -1409,25 +1653,58 @@ def code_task_reference_solution(dictionary: Any, task_id: str) -> str | None:
     code exercise is actually solvable, never shown to the student."""
     for spec in _CODE_TASK_SPECS.values():
         if spec["id"] == task_id:
-            tokens = {cid: _token(dictionary, cid) for cid in _FALLBACK_TOKENS}
-            return _code_header(dictionary) + spec["solution"](tokens)
+            mode = code_task_syntax_mode(dictionary, task_id)
+            tokens = _practice_tokens(dictionary, mode)
+            header = _code_header(dictionary) if mode == "personal" else ""
+            return header + spec["solution"](tokens)
     return None
 
 
-def _code_task(dictionary: Any, module_id: str) -> PracticeTask | None:
+def code_task_syntax_mode(dictionary: Any, task_id: str) -> str | None:
+    module_id = code_task_module_id(task_id)
+    if module_id is None:
+        return None
+    module = build_learning_module(dictionary, module_id)
+    task = next((item for item in module.practice_tasks if item.id == task_id), None)
+    return task.syntax_mode if task is not None else None
+
+
+def _practice_tokens(dictionary: Any, syntax_mode: str) -> dict[str, str]:
+    if syntax_mode == "python":
+        return {
+            concept_id: _CONCEPT_COPY.get(
+                concept_id,
+                (_FALLBACK_TOKENS[concept_id], "", ""),
+            )[0]
+            for concept_id in _FALLBACK_TOKENS
+        }
+    return {cid: _token(dictionary, cid) for cid in _FALLBACK_TOKENS}
+
+
+def _code_task(
+    dictionary: Any,
+    module_id: str,
+    syntax_mode: str,
+) -> PracticeTask | None:
     spec = _CODE_TASK_SPECS.get(module_id)
     if spec is None:
         return None
-    tokens = {cid: _token(dictionary, cid) for cid in _FALLBACK_TOKENS}
+    tokens = _practice_tokens(dictionary, syntax_mode)
+    header = _code_header(dictionary) if syntax_mode == "personal" else ""
     return PracticeTask(
         id=str(spec["id"]),
         kind="write_code",
         concept_id=str(spec["concept_id"]),
-        prompt=str(spec["prompt"]),
+        prompt=(
+            str(spec["prompt"])
+            if syntax_mode == "personal"
+            else f"Write standard Python. {spec['prompt']}"
+        ),
         expected_answer=str(spec["expected_stdout"]),
-        starter_source=_code_header(dictionary) + spec["starter"](tokens),
+        starter_source=header + spec["starter"](tokens),
         hint=str(spec["hint"]),
         explanation=str(spec["explanation"]),
+        syntax_mode=syntax_mode,
     )
 
 
@@ -1444,17 +1721,39 @@ _TASK_ANSWERS: dict[str, tuple[str, ...]] = {
     "signals-multiple-values": ("score: 12",),
     "strings-clean": ("whitespace at both ends",),
     "strings-translate": ("upper",),
+    "strings-immutable-original": ("code",),
+    "strings-replace-output": ("red-blue",),
+    "strings-split-result": ("a list of strings", "list of strings", "list"),
     "numbers-int-truncation": ("3", "three"),
     "numbers-absolute-value": ("8", "eight"),
+    "numbers-float-arithmetic": ("5.0", "5"),
+    "numbers-round-precision": ("3.14",),
+    "numbers-power-result": ("32", "thirty two", "thirty-two"),
     "imports-module-access": ("cv_math.sqrt",),
     "imports-from-purpose": ("mean",),
+    "imports-direct-namespace": ("math.sqrt",),
+    "imports-ceil-result": ("5", "five"),
+    "imports-selected-alias": ("cv_average",),
     "choices-branch": ("keep practicing",),
     "choices-order": ("if",),
+    "choices-equality-operator": ("==", "double equals", "two equals signs"),
+    "choices-first-match": ("pass",),
+    "choices-indentation-scope": ("indentation", "indent", "whitespace indentation"),
     "routes-count": ("3", "three"),
     "routes-translate": ("for",),
+    "routes-start-stop-values": ("2 3 4", "2, 3, 4", "2\n3\n4"),
+    "routes-step-values": ("1 3 5 7", "1, 3, 5, 7", "1\n3\n5\n7"),
+    "routes-accumulator-total": ("6", "six"),
     "loop-control-output": ("1 3", "1\n3", "1, 3"),
+    "loop-control-while-count": ("1 2 3", "1, 2, 3", "1\n2\n3"),
+    "loop-control-break-output": ("1 2", "1, 2", "1\n2"),
+    "loop-control-safe-progress": ("the condition state", "condition state", "condition variable"),
+    "loop-control-continue-effect": ("the rest of the current iteration", "rest of current iteration", "current iteration"),
     "tools-return": ("150",),
     "tools-translate": ("def",),
+    "tools-definition-execution": ("when the function is called", "when called", "on call"),
+    "tools-parameter-argument": ("an argument", "argument"),
+    "tools-early-return-output": ("denied",),
     "logic-output": ("go empty", "go\nempty"),
     "collections-length": ("2", "two"),
     "collections-get": ("150",),
@@ -1474,17 +1773,39 @@ _TASK_MODULES: dict[str, str] = {
     "signals-multiple-values": "signals-and-values",
     "strings-clean": "strings-and-text",
     "strings-translate": "strings-and-text",
+    "strings-immutable-original": "strings-and-text",
+    "strings-replace-output": "strings-and-text",
+    "strings-split-result": "strings-and-text",
     "numbers-int-truncation": "numbers-and-conversion",
     "numbers-absolute-value": "numbers-and-conversion",
+    "numbers-float-arithmetic": "numbers-and-conversion",
+    "numbers-round-precision": "numbers-and-conversion",
+    "numbers-power-result": "numbers-and-conversion",
     "imports-module-access": "imports-and-library",
     "imports-from-purpose": "imports-and-library",
+    "imports-direct-namespace": "imports-and-library",
+    "imports-ceil-result": "imports-and-library",
+    "imports-selected-alias": "imports-and-library",
     "choices-branch": "choices",
     "choices-order": "choices",
+    "choices-equality-operator": "choices",
+    "choices-first-match": "choices",
+    "choices-indentation-scope": "choices",
     "routes-count": "routes",
     "routes-translate": "routes",
+    "routes-start-stop-values": "routes",
+    "routes-step-values": "routes",
+    "routes-accumulator-total": "routes",
     "loop-control-output": "loop-control",
+    "loop-control-while-count": "loop-control",
+    "loop-control-break-output": "loop-control",
+    "loop-control-safe-progress": "loop-control",
+    "loop-control-continue-effect": "loop-control",
     "tools-return": "tools",
     "tools-translate": "tools",
+    "tools-definition-execution": "tools",
+    "tools-parameter-argument": "tools",
+    "tools-early-return-output": "tools",
     "logic-output": "logic",
     "collections-length": "collections",
     "collections-get": "collections",
@@ -1505,6 +1826,658 @@ def _bridge_steps(concepts: tuple[LearningConcept, ...]) -> tuple[str, ...]:
 
 
 def _lesson_sections(module_id: str, dictionary: Any) -> tuple[LessonSection, ...]:
+    if module_id == "tools":
+        output = _token(dictionary, "py_fn_print")
+        define = _token(dictionary, "py_kw_def")
+        result = _token(dictionary, "py_kw_return")
+        first_if = _token(dictionary, "py_kw_if")
+        return (
+            LessonSection(
+                section_id="tools-define-and-call",
+                title="Define behavior, then call it",
+                objective="Separate creating a reusable function from executing that function.",
+                explanation=(
+                    "A function definition stores a named block of behavior. Python does not run the body at the point "
+                    "of definition; a later call enters the body."
+                ),
+                key_points=(
+                    "def creates the function object and binds its name.",
+                    "The indented body belongs to the function.",
+                    "Parentheses after the name perform a call.",
+                ),
+                personal_example=f'{define} cv_greet():\n    {output}("hello")\ncv_greet()',
+                real_python_example='def cv_greet():\n    print("hello")\ncv_greet()',
+                expected_output="hello\n",
+            ),
+            LessonSection(
+                section_id="tools-parameters-and-arguments",
+                title="Pass information through parameters",
+                objective="Define a placeholder parameter and supply a concrete argument at the call site.",
+                explanation=(
+                    "A parameter is a local name declared by the function. Each call binds an argument value to that "
+                    "name, allowing one function body to work with different inputs."
+                ),
+                key_points=(
+                    "Parameters appear in the function definition.",
+                    "Arguments appear in the function call.",
+                    "Each call gets its own parameter values.",
+                ),
+                personal_example=(
+                    f'{define} cv_double(cv_value):\n    {result} cv_value * 2\n'
+                    f'{output}(cv_double(4))\n{output}(cv_double(7))'
+                ),
+                real_python_example=(
+                    'def cv_double(cv_value):\n    return cv_value * 2\n'
+                    'print(cv_double(4))\nprint(cv_double(7))'
+                ),
+                expected_output="8\n14\n",
+            ),
+            LessonSection(
+                section_id="tools-return-versus-print",
+                title="Return a value instead of only displaying it",
+                objective="Send a computed value back to the caller so other code can reuse it.",
+                explanation=(
+                    "print creates visible output but returns no useful computed result. return ends the function call "
+                    "and hands a value to the surrounding expression."
+                ),
+                key_points=(
+                    "return passes a value back to the caller.",
+                    "The caller can assign, combine, or print the returned value.",
+                    "Code after an executed return in the same function call is unreachable.",
+                ),
+                personal_example=(
+                    f'{define} cv_reward(cv_base):\n    {result} cv_base + 50\n'
+                    f'cv_total = cv_reward(100)\n{output}(cv_total + 25)'
+                ),
+                real_python_example=(
+                    'def cv_reward(cv_base):\n    return cv_base + 50\n'
+                    'cv_total = cv_reward(100)\nprint(cv_total + 25)'
+                ),
+                expected_output="175\n",
+            ),
+            LessonSection(
+                section_id="tools-early-return",
+                title="Exit early when a guard condition fails",
+                objective="Use return inside a branch to stop unnecessary work.",
+                explanation=(
+                    "An early return handles a special or invalid case near the top of a function. Once it runs, the "
+                    "remaining statements in that call are skipped."
+                ),
+                key_points=(
+                    "A function can contain more than one return path.",
+                    "Only the return reached by the current execution runs.",
+                    "Guard clauses can reduce deep nesting.",
+                ),
+                personal_example=(
+                    f'{define} cv_access(cv_age):\n    {first_if} cv_age < 18:\n'
+                    f'        {result} "denied"\n    {result} "allowed"\n'
+                    f'{output}(cv_access(16))\n{output}(cv_access(20))'
+                ),
+                real_python_example=(
+                    'def cv_access(cv_age):\n    if cv_age < 18:\n'
+                    '        return "denied"\n    return "allowed"\n'
+                    'print(cv_access(16))\nprint(cv_access(20))'
+                ),
+                expected_output="denied\nallowed\n",
+            ),
+            LessonSection(
+                section_id="tools-default-parameter",
+                title="Provide a useful default parameter",
+                objective="Allow a caller to omit an argument while preserving predictable behavior.",
+                explanation=(
+                    "A default value is used only when the caller omits that argument. Passing an explicit argument "
+                    "overrides the default for that call without changing later calls."
+                ),
+                key_points=(
+                    "Default values are declared in the parameter list.",
+                    "A call with no argument uses the default.",
+                    "A supplied argument replaces the default for that call.",
+                ),
+                personal_example=(
+                    f'{define} cv_greet(cv_name="learner"):\n    {result} "hello " + cv_name\n'
+                    f'{output}(cv_greet())\n{output}(cv_greet("Ada"))'
+                ),
+                real_python_example=(
+                    'def cv_greet(cv_name="learner"):\n    return "hello " + cv_name\n'
+                    'print(cv_greet())\nprint(cv_greet("Ada"))'
+                ),
+                expected_output="hello learner\nhello Ada\n",
+            ),
+        )
+
+    if module_id == "loop-control":
+        output = _token(dictionary, "py_fn_print")
+        repeat_while = _token(dictionary, "py_kw_while")
+        first_if = _token(dictionary, "py_kw_if")
+        stop = _token(dictionary, "py_kw_break")
+        skip = _token(dictionary, "py_kw_continue")
+        return (
+            LessonSection(
+                section_id="loop-control-while-condition",
+                title="Repeat while a condition remains true",
+                objective="Use a changing condition to control an unknown number of repetitions.",
+                explanation=(
+                    "A while loop evaluates its condition before every iteration. It is useful when repetition depends "
+                    "on changing state rather than a prebuilt sequence."
+                ),
+                key_points=(
+                    "The condition is checked before the first iteration.",
+                    "A false initial condition means the block runs zero times.",
+                    "The loop returns to the condition after each completed block.",
+                ),
+                personal_example=(
+                    f'cv_step = 0\n{repeat_while} cv_step < 3:\n'
+                    f'    cv_step = cv_step + 1\n    {output}(cv_step)'
+                ),
+                real_python_example=(
+                    'cv_step = 0\nwhile cv_step < 3:\n'
+                    '    cv_step = cv_step + 1\n    print(cv_step)'
+                ),
+                expected_output="1\n2\n3\n",
+            ),
+            LessonSection(
+                section_id="loop-control-progress-toward-stop",
+                title="Make progress toward termination",
+                objective="Update loop state so the condition eventually becomes false.",
+                explanation=(
+                    "A while loop needs a credible exit path. Updating the condition variable inside the block makes "
+                    "termination visible and prevents accidental infinite repetition."
+                ),
+                key_points=(
+                    "Identify which value controls the condition.",
+                    "Change that value on every relevant path.",
+                    "Trace the final iteration to prove the loop stops.",
+                ),
+                personal_example=(
+                    f'cv_count = 3\n{repeat_while} cv_count > 0:\n'
+                    f'    {output}(cv_count)\n    cv_count = cv_count - 1'
+                ),
+                real_python_example=(
+                    'cv_count = 3\nwhile cv_count > 0:\n'
+                    '    print(cv_count)\n    cv_count = cv_count - 1'
+                ),
+                expected_output="3\n2\n1\n",
+            ),
+            LessonSection(
+                section_id="loop-control-continue-skip",
+                title="Skip one iteration with continue",
+                objective="Ignore a selected value without terminating the surrounding loop.",
+                explanation=(
+                    "continue ends only the current iteration. Control returns to the while condition, so later values "
+                    "can still be processed. State updates must happen before continue when they drive termination."
+                ),
+                key_points=(
+                    "continue does not exit the loop.",
+                    "Statements below continue are skipped for that iteration.",
+                    "Update the counter before continuing to avoid a stuck loop.",
+                ),
+                personal_example=(
+                    f'cv_step = 0\n{repeat_while} cv_step < 3:\n    cv_step = cv_step + 1\n'
+                    f'    {first_if} cv_step == 2:\n        {skip}\n    {output}(cv_step)'
+                ),
+                real_python_example=(
+                    'cv_step = 0\nwhile cv_step < 3:\n    cv_step = cv_step + 1\n'
+                    '    if cv_step == 2:\n        continue\n    print(cv_step)'
+                ),
+                expected_output="1\n3\n",
+            ),
+            LessonSection(
+                section_id="loop-control-break-exit",
+                title="Exit immediately with break",
+                objective="Stop the nearest loop when a terminating event is found.",
+                explanation=(
+                    "break skips the rest of the current iteration and prevents every future iteration of the nearest "
+                    "loop. Execution resumes at the first statement after that loop."
+                ),
+                key_points=(
+                    "break exits the nearest active loop.",
+                    "The break condition is often a successful search or safety limit.",
+                    "Code below break in the current block does not run.",
+                ),
+                personal_example=(
+                    f'cv_step = 0\n{repeat_while} cv_step < 5:\n    cv_step = cv_step + 1\n'
+                    f'    {first_if} cv_step == 3:\n        {stop}\n    {output}(cv_step)'
+                ),
+                real_python_example=(
+                    'cv_step = 0\nwhile cv_step < 5:\n    cv_step = cv_step + 1\n'
+                    '    if cv_step == 3:\n        break\n    print(cv_step)'
+                ),
+                expected_output="1\n2\n",
+            ),
+            LessonSection(
+                section_id="loop-control-combine-decisions",
+                title="Combine skip and stop rules deliberately",
+                objective="Order continue and break checks so each value follows the intended path.",
+                explanation=(
+                    "Loop-control statements interact with branch order. A continue encountered first can prevent a "
+                    "later break check, so the ordering of rules is part of the algorithm."
+                ),
+                key_points=(
+                    "Evaluate skip and stop rules in a deliberate order.",
+                    "continue affects one iteration; break affects the whole loop.",
+                    "Trace representative values before running the code.",
+                ),
+                personal_example=(
+                    f'cv_step = 0\n{repeat_while} cv_step < 6:\n    cv_step = cv_step + 1\n'
+                    f'    {first_if} cv_step % 2 == 0:\n        {skip}\n'
+                    f'    {first_if} cv_step > 3:\n        {stop}\n    {output}(cv_step)'
+                ),
+                real_python_example=(
+                    'cv_step = 0\nwhile cv_step < 6:\n    cv_step = cv_step + 1\n'
+                    '    if cv_step % 2 == 0:\n        continue\n'
+                    '    if cv_step > 3:\n        break\n    print(cv_step)'
+                ),
+                expected_output="1\n3\n",
+            ),
+        )
+
+    if module_id == "routes":
+        output = _token(dictionary, "py_fn_print")
+        loop = _token(dictionary, "py_kw_for")
+        membership = _token(dictionary, "py_kw_in")
+        number_route = _token(dictionary, "py_fn_range")
+        return (
+            LessonSection(
+                section_id="routes-visit-each-item",
+                title="Visit each item in a sequence",
+                objective="Bind one loop variable to each item and run the indented block once per item.",
+                explanation=(
+                    "A for loop asks a sequence for its items one at a time. The loop variable is reassigned "
+                    "automatically before each execution of the block."
+                ),
+                key_points=(
+                    "for introduces the loop variable.",
+                    "in connects that variable to the sequence.",
+                    "The indented block runs once for every item.",
+                ),
+                personal_example=(
+                    f'cv_routes = ["dock", "market"]\n{loop} cv_route {membership} cv_routes:\n'
+                    f'    {output}(cv_route)'
+                ),
+                real_python_example=(
+                    'cv_routes = ["dock", "market"]\nfor cv_route in cv_routes:\n'
+                    '    print(cv_route)'
+                ),
+                expected_output="dock\nmarket\n",
+            ),
+            LessonSection(
+                section_id="routes-range-stop",
+                title="Generate a route with an exclusive stop",
+                objective="Predict the values produced by the one-argument form of range.",
+                explanation=(
+                    "range(stop) starts at zero and stops before the provided boundary. The excluded stop makes the "
+                    "number of produced values equal to stop when stop is positive."
+                ),
+                key_points=(
+                    "range(3) produces 0, 1, and 2.",
+                    "The stop value is never included.",
+                    "Each generated integer becomes the loop variable in turn.",
+                ),
+                personal_example=f'{loop} cv_step {membership} {number_route}(3):\n    {output}(cv_step)',
+                real_python_example='for cv_step in range(3):\n    print(cv_step)',
+                expected_output="0\n1\n2\n",
+            ),
+            LessonSection(
+                section_id="routes-range-start-stop",
+                title="Choose both start and stop boundaries",
+                objective="Generate a specific consecutive interval without manual counter updates.",
+                explanation=(
+                    "range(start, stop) includes start and excludes stop. This lets a loop express a numeric interval "
+                    "directly while Python manages each next value."
+                ),
+                key_points=(
+                    "The first argument is included.",
+                    "The second argument is excluded.",
+                    "range(2, 5) produces 2, 3, and 4.",
+                ),
+                personal_example=f'{loop} cv_step {membership} {number_route}(2, 5):\n    {output}(cv_step)',
+                real_python_example='for cv_step in range(2, 5):\n    print(cv_step)',
+                expected_output="2\n3\n4\n",
+            ),
+            LessonSection(
+                section_id="routes-range-step",
+                title="Control movement with a step",
+                objective="Skip through a numeric interval using the three-argument form of range.",
+                explanation=(
+                    "The third range argument controls the distance between generated values. A positive step moves "
+                    "upward, while a negative step can move downward when the boundaries support it."
+                ),
+                key_points=(
+                    "range(start, stop, step) still excludes stop.",
+                    "A step of 2 visits every second integer.",
+                    "The step cannot be zero.",
+                ),
+                personal_example=f'{loop} cv_step {membership} {number_route}(1, 8, 2):\n    {output}(cv_step)',
+                real_python_example='for cv_step in range(1, 8, 2):\n    print(cv_step)',
+                expected_output="1\n3\n5\n7\n",
+            ),
+            LessonSection(
+                section_id="routes-accumulate-result",
+                title="Accumulate a result across iterations",
+                objective="Update one value inside a loop to summarize the visited items.",
+                explanation=(
+                    "Many loops produce a result rather than only printing each item. An accumulator begins before "
+                    "the loop, changes once per iteration, and is read after the loop finishes."
+                ),
+                key_points=(
+                    "Initialize the accumulator before entering the loop.",
+                    "Update it inside the indented block.",
+                    "Read the final value after the loop has completed.",
+                ),
+                personal_example=(
+                    f'cv_total = 0\n{loop} cv_value {membership} {number_route}(1, 4):\n'
+                    f'    cv_total = cv_total + cv_value\n{output}(cv_total)'
+                ),
+                real_python_example=(
+                    'cv_total = 0\nfor cv_value in range(1, 4):\n'
+                    '    cv_total = cv_total + cv_value\nprint(cv_total)'
+                ),
+                expected_output="6\n",
+            ),
+        )
+
+    if module_id == "choices":
+        output = _token(dictionary, "py_fn_print")
+        first_if = _token(dictionary, "py_kw_if")
+        second_if = _token(dictionary, "py_kw_elif")
+        fallback = _token(dictionary, "py_kw_else")
+        return (
+            LessonSection(
+                section_id="choices-condition-result",
+                title="Turn a comparison into a decision",
+                objective="Use a boolean comparison to decide whether an indented block runs.",
+                explanation=(
+                    "An if statement first evaluates its condition. When the result is true, Python enters the "
+                    "indented block; when it is false, that block is skipped."
+                ),
+                key_points=(
+                    "Comparison uses operators such as ==, >=, and <.",
+                    "A colon opens the controlled block.",
+                    "Indentation marks which statements belong to that block.",
+                ),
+                personal_example=f'cv_score = 85\n{first_if} cv_score >= 80:\n    {output}("mastered")',
+                real_python_example='cv_score = 85\nif cv_score >= 80:\n    print("mastered")',
+                expected_output="mastered\n",
+            ),
+            LessonSection(
+                section_id="choices-two-paths",
+                title="Choose between two exclusive paths",
+                objective="Pair if with else so exactly one fallback path runs.",
+                explanation=(
+                    "else has no condition of its own. It runs only when the preceding if condition is false, making "
+                    "the two blocks mutually exclusive in this decision chain."
+                ),
+                key_points=(
+                    "if handles the true path.",
+                    "else handles the remaining false path.",
+                    "Only one branch in the chain runs.",
+                ),
+                personal_example=(
+                    f'cv_fuel = 0\n{first_if} cv_fuel > 0:\n    {output}("launch")\n'
+                    f'{fallback}:\n    {output}("refuel")'
+                ),
+                real_python_example=(
+                    'cv_fuel = 0\nif cv_fuel > 0:\n    print("launch")\n'
+                    'else:\n    print("refuel")'
+                ),
+                expected_output="refuel\n",
+            ),
+            LessonSection(
+                section_id="choices-multiple-conditions",
+                title="Test several ordered conditions",
+                objective="Use elif to express additional possibilities in one decision chain.",
+                explanation=(
+                    "Python checks the chain from top to bottom. Each elif is considered only when every earlier "
+                    "condition failed, and else remains the final fallback."
+                ),
+                key_points=(
+                    "elif belongs to the same chain as its opening if.",
+                    "Conditions should usually be ordered from most specific to most general.",
+                    "The first successful branch ends the chain.",
+                ),
+                personal_example=(
+                    f'cv_score = 75\n{first_if} cv_score >= 80:\n    {output}("mastered")\n'
+                    f'{second_if} cv_score >= 50:\n    {output}("practicing")\n'
+                    f'{fallback}:\n    {output}("starting")'
+                ),
+                real_python_example=(
+                    'cv_score = 75\nif cv_score >= 80:\n    print("mastered")\n'
+                    'elif cv_score >= 50:\n    print("practicing")\n'
+                    'else:\n    print("starting")'
+                ),
+                expected_output="practicing\n",
+            ),
+            LessonSection(
+                section_id="choices-first-match-wins",
+                title="Understand why branch order matters",
+                objective="Predict the result when more than one condition could be true.",
+                explanation=(
+                    "A later condition is never checked after an earlier branch succeeds. Broad conditions placed too "
+                    "early can therefore hide more specific branches."
+                ),
+                key_points=(
+                    "A value can satisfy more than one comparison.",
+                    "Only the first matching branch executes.",
+                    "Put narrower thresholds before broader thresholds.",
+                ),
+                personal_example=(
+                    f'cv_score = 95\n{first_if} cv_score >= 50:\n    {output}("pass")\n'
+                    f'{second_if} cv_score >= 90:\n    {output}("excellent")'
+                ),
+                real_python_example=(
+                    'cv_score = 95\nif cv_score >= 50:\n    print("pass")\n'
+                    'elif cv_score >= 90:\n    print("excellent")'
+                ),
+                expected_output="pass\n",
+            ),
+            LessonSection(
+                section_id="choices-nested-decisions",
+                title="Nest a second decision when it depends on the first",
+                objective="Place one if block inside another without losing track of scope.",
+                explanation=(
+                    "Nested decisions are useful when a second check only makes sense after the first succeeds. Each "
+                    "indentation level represents a deeper requirement."
+                ),
+                key_points=(
+                    "The inner condition is reached only through the outer true path.",
+                    "Consistent indentation communicates block ownership.",
+                    "Deep nesting can often be simplified later with combined boolean logic.",
+                ),
+                personal_example=(
+                    f'cv_age = 20\ncv_has_ticket = 1\n{first_if} cv_age >= 18:\n'
+                    f'    {first_if} cv_has_ticket == 1:\n        {output}("enter")'
+                ),
+                real_python_example=(
+                    'cv_age = 20\ncv_has_ticket = 1\nif cv_age >= 18:\n'
+                    '    if cv_has_ticket == 1:\n        print("enter")'
+                ),
+                expected_output="enter\n",
+            ),
+        )
+
+    if module_id == "imports-and-library":
+        output = _token(dictionary, "py_fn_print")
+        import_token = _token(dictionary, "py_kw_import")
+        from_token = _token(dictionary, "py_kw_from")
+        alias_token = _token(dictionary, "py_kw_as")
+        return (
+            LessonSection(
+                section_id="imports-module-namespace",
+                title="Load a module as a namespace",
+                objective="Import one standard-library module and access a tool through its module name.",
+                explanation=(
+                    "A module groups related names. A plain import binds the module itself, so member access keeps "
+                    "the source visible and avoids filling the current scope with unrelated names."
+                ),
+                key_points=(
+                    "import math binds the name math.",
+                    "A dot selects a member such as math.sqrt.",
+                    "Importing a module does not call any member automatically.",
+                ),
+                personal_example=f'{import_token} math\n{output}(math.sqrt(81))',
+                real_python_example='import math\nprint(math.sqrt(81))',
+                expected_output="9.0\n",
+            ),
+            LessonSection(
+                section_id="imports-module-alias",
+                title="Create a concise local module alias",
+                objective="Bind a module to a clear local name without changing the original library.",
+                explanation=(
+                    "An alias affects only the current file. It can reduce repetition or prevent a naming collision, "
+                    "but the imported module and its public API remain unchanged."
+                ),
+                key_points=(
+                    "The alias becomes the local namespace name.",
+                    "Use the alias consistently after importing it.",
+                    "Prefer descriptive aliases over unclear abbreviations.",
+                ),
+                personal_example=(
+                    f'{import_token} statistics {alias_token} cv_stats\n'
+                    f'{output}(cv_stats.mean([2, 4, 6]))'
+                ),
+                real_python_example=(
+                    'import statistics as cv_stats\n'
+                    'print(cv_stats.mean([2, 4, 6]))'
+                ),
+                expected_output="4\n",
+            ),
+            LessonSection(
+                section_id="imports-select-member",
+                title="Import one selected member",
+                objective="Use from-import when a specific tool should be available directly.",
+                explanation=(
+                    "A from-import binds selected members rather than the module namespace. This is concise, but the "
+                    "origin becomes less visible at each call site, so explicit selections matter."
+                ),
+                key_points=(
+                    "from math import ceil binds ceil directly.",
+                    "The call no longer needs the math prefix.",
+                    "Explicit member names are safer and clearer than wildcard imports.",
+                ),
+                personal_example=f'{from_token} math {import_token} ceil\n{output}(ceil(4.2))',
+                real_python_example='from math import ceil\nprint(ceil(4.2))',
+                expected_output="5\n",
+            ),
+            LessonSection(
+                section_id="imports-select-and-alias",
+                title="Alias a selected member",
+                objective="Resolve a local naming conflict while importing only the required tool.",
+                explanation=(
+                    "from, import, and as can work together. The selected function is bound to the alias, making its "
+                    "role explicit inside the current program without modifying the library."
+                ),
+                key_points=(
+                    "The alias is the callable name used after the import.",
+                    "Only the selected member is bound directly.",
+                    "A meaningful alias can communicate the tool's role in the program.",
+                ),
+                personal_example=(
+                    f'{from_token} statistics {import_token} mean {alias_token} cv_average\n'
+                    f'{output}(cv_average([10, 20, 30]))'
+                ),
+                real_python_example=(
+                    'from statistics import mean as cv_average\n'
+                    'print(cv_average([10, 20, 30]))'
+                ),
+                expected_output="20\n",
+            ),
+        )
+
+    if module_id == "numbers-and-conversion":
+        output = _token(dictionary, "py_fn_print")
+        integer = _token(dictionary, "py_fn_int")
+        decimal = _token(dictionary, "py_fn_float")
+        rounded = _token(dictionary, "py_fn_round")
+        absolute = _token(dictionary, "py_fn_abs")
+        power = _token(dictionary, "py_fn_pow")
+        return (
+            LessonSection(
+                section_id="numbers-text-to-integer",
+                title="Convert numeric text into an integer",
+                objective="Turn whole-number text into a value that can participate in arithmetic.",
+                explanation=(
+                    "Files, forms, and APIs commonly provide digits as strings. int validates compatible text and "
+                    "returns a whole-number value instead of changing the original string."
+                ),
+                key_points=(
+                    "int accepts compatible whole-number text such as \"21\".",
+                    "The returned integer can be added, compared, and counted.",
+                    "Invalid text such as \"twenty\" raises ValueError.",
+                ),
+                personal_example=f'cv_count = {integer}("21")\n{output}(cv_count + 9)',
+                real_python_example='cv_count = int("21")\nprint(cv_count + 9)',
+                expected_output="30\n",
+            ),
+            LessonSection(
+                section_id="numbers-text-to-float",
+                title="Preserve decimal information with float",
+                objective="Convert decimal text without discarding its fractional part.",
+                explanation=(
+                    "float represents numbers with a fractional component. It is appropriate for measurements and "
+                    "approximate decimal calculations where an integer would lose information."
+                ),
+                key_points=(
+                    "float converts decimal text such as \"12.5\".",
+                    "Arithmetic with a float normally produces a float.",
+                    "Floating-point values are approximate binary representations.",
+                ),
+                personal_example=f'cv_price = {decimal}("12.5")\n{output}(cv_price * 2)',
+                real_python_example='cv_price = float("12.5")\nprint(cv_price * 2)',
+                expected_output="25.0\n",
+            ),
+            LessonSection(
+                section_id="numbers-round-precision",
+                title="Control visible precision with round",
+                objective="Round a numeric result to a requested number of decimal places.",
+                explanation=(
+                    "round returns a new numeric value at the requested precision. It is useful for presentation, "
+                    "but it does not make floating-point arithmetic exact."
+                ),
+                key_points=(
+                    "The second argument specifies decimal places.",
+                    "round returns a value; it does not mutate the original variable.",
+                    "Python uses its defined tie-breaking behavior for halfway cases.",
+                ),
+                personal_example=f'cv_pi = 3.14159\n{output}({rounded}(cv_pi, 2))',
+                real_python_example='cv_pi = 3.14159\nprint(round(cv_pi, 2))',
+                expected_output="3.14\n",
+            ),
+            LessonSection(
+                section_id="numbers-absolute-distance",
+                title="Measure distance from zero with abs",
+                objective="Remove the direction of a numeric difference while preserving its magnitude.",
+                explanation=(
+                    "Absolute value expresses distance from zero. It is useful for comparing differences, tolerances, "
+                    "and errors when the sign is not the important part."
+                ),
+                key_points=(
+                    "Negative inputs produce a non-negative magnitude.",
+                    "Positive inputs keep their value.",
+                    "abs does not mean rounding or truncation.",
+                ),
+                personal_example=f'cv_difference = -8\n{output}({absolute}(cv_difference))',
+                real_python_example='cv_difference = -8\nprint(abs(cv_difference))',
+                expected_output="8\n",
+            ),
+            LessonSection(
+                section_id="numbers-power-growth",
+                title="Express repeated multiplication with pow",
+                objective="Raise a base number to an exponent without writing repeated multiplication.",
+                explanation=(
+                    "pow(base, exponent) represents exponential growth. It is the function form of Python's power "
+                    "operator and makes the two roles explicit."
+                ),
+                key_points=(
+                    "The first argument is the base.",
+                    "The second argument is the exponent.",
+                    "pow(2, 5) means multiply five factors of 2.",
+                ),
+                personal_example=f'{output}({power}(2, 5))',
+                real_python_example='print(pow(2, 5))',
+                expected_output="32\n",
+            ),
+        )
+
     if module_id == "strings-and-text":
         output = _token(dictionary, "py_fn_print")
         convert = _token(dictionary, "py_fn_str")
@@ -1698,18 +2671,28 @@ def _misconception_checks(module_id: str) -> tuple[str, ...]:
         "choices": (
             "else is not checked first; it only runs after earlier conditions fail.",
             "elif is not a separate if chain; it belongs to the same decision path.",
+            "= assigns a value; == compares two values for equality.",
+            "A later, more specific branch cannot run after an earlier broad condition already matched.",
+            "Indentation is executable structure in Python, not visual decoration.",
         ),
         "routes": (
             "range stop values are excluded.",
             "A for loop changes the loop variable automatically on each turn.",
+            "The third range argument is the step, and it cannot be zero.",
+            "An accumulator must be initialized before the loop if its final value is needed afterward.",
         ),
         "loop-control": (
             "continue does not stop the loop; break stops the loop.",
             "while needs a changing condition or it can run forever.",
+            "A counter update placed after continue may never run for skipped iterations.",
+            "break exits only the nearest loop, not every surrounding loop or the whole program.",
         ),
         "tools": (
             "print shows a value; return gives a value back to the caller.",
             "A function definition does not run until the function is called.",
+            "A parameter is declared by the function; an argument is supplied by a call.",
+            "An executed return ends the current function call immediately.",
+            "A default argument is used only when the caller omits that value.",
         ),
         "collections": (
             "list positions are ordered; dict values are found by key.",
@@ -1767,6 +2750,69 @@ def _success_criteria(module_id: str) -> tuple[str, ...]:
             "Use a variable and observe its latest assigned value.",
             "Write and run labeled output with your personal print token.",
             "Score at least 70% across knowledge and code checks.",
+        )
+    if module_id == "strings-and-text":
+        return (
+            "Convert a non-text value before joining it to a string.",
+            "Clean boundary whitespace without removing internal spacing.",
+            "Explain why string methods do not mutate the original value.",
+            "Normalize case and replace a selected text fragment.",
+            "Split text into a list and identify the result type.",
+            "Complete the transformation pipeline in personal syntax.",
+        )
+    if module_id == "numbers-and-conversion":
+        return (
+            "Convert compatible numeric text into int and float values.",
+            "Explain why int truncation is different from rounding.",
+            "Round a float to a requested display precision.",
+            "Use absolute value to measure distance from zero.",
+            "Use a base and exponent to calculate a power.",
+            "Choose a conversion that produces the required output type.",
+        )
+    if module_id == "imports-and-library":
+        return (
+            "Import a standard-library module and access a member through its namespace.",
+            "Use a clear local alias without confusing it with the original module name.",
+            "Select one member with from-import and call it directly.",
+            "Explain why explicit imports are clearer than wildcard imports.",
+            "Alias a selected member to resolve a local naming need.",
+            "Complete a behaviorally checked standard-library import task.",
+        )
+    if module_id == "choices":
+        return (
+            "Use a comparison to control an indented if block.",
+            "Distinguish equality comparison from assignment.",
+            "Build an exclusive if/else decision.",
+            "Order if/elif/else conditions from specific to general.",
+            "Predict which branch wins when conditions overlap.",
+            "Read and write a nested decision with correct indentation.",
+        )
+    if module_id == "routes":
+        return (
+            "Explain how for, in, and the loop variable work together.",
+            "Predict the exclusive stop behavior of range.",
+            "Use start and stop boundaries to generate an interval.",
+            "Use a non-zero step to control numeric movement.",
+            "Accumulate a result across multiple iterations.",
+            "Complete a behaviorally checked range exercise.",
+        )
+    if module_id == "loop-control":
+        return (
+            "Trace a while condition before and after each iteration.",
+            "Update state so a condition-controlled loop can terminate.",
+            "Use continue without skipping required state updates.",
+            "Use break to exit the nearest loop immediately.",
+            "Predict how rule order changes continue and break behavior.",
+            "Complete a behaviorally checked loop-control exercise.",
+        )
+    if module_id == "tools":
+        return (
+            "Distinguish defining a function from calling it.",
+            "Explain the relationship between parameters and arguments.",
+            "Return a value that the caller can reuse in another expression.",
+            "Distinguish visible print output from a returned result.",
+            "Use an early return to handle a guard condition.",
+            "Use and override a default parameter in separate calls.",
         )
     return (
         "Explain each personal token as a real Python concept.",

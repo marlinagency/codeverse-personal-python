@@ -76,6 +76,18 @@ export async function listThemes(token: string): Promise<ThemeDictionary[]> {
   return request('/themes', { token })
 }
 
+export async function regenerateTheme(
+  token: string,
+  themeId: string,
+  theme?: string,
+): Promise<ThemeDictionary> {
+  return request(`/themes/${themeId}/regenerate`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ theme: theme?.trim() || null }),
+  })
+}
+
 export async function compileSource(
   token: string,
   sourceContent: string,

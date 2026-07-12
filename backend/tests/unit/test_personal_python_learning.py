@@ -131,6 +131,55 @@ def _run_compiled(pipeline: CompilationPipeline, source: str, dictionary) -> str
     return stdout.getvalue()
 
 
+def _run_practice_source(
+    pipeline: CompilationPipeline,
+    source: str,
+    dictionary,
+    syntax_mode: str,
+) -> str:
+    if syntax_mode == "personal":
+        return _run_compiled(pipeline, source, dictionary)
+    stdout = io.StringIO()
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with contextlib.chdir(temp_dir), contextlib.redirect_stdout(stdout):
+            exec(source, {})  # noqa: S102 - generated standard-Python exercise.
+    return stdout.getvalue()
+
+
+def test_rich_lesson_section_examples_match_real_python_behavior():
+    dictionary = _dictionary("I want visible examples for strings")
+    pipeline = CompilationPipeline()
+
+    for module_id, expected_sections, expected_tasks in (
+        ("signals-and-values", 4, 6),
+        ("strings-and-text", 5, 6),
+        ("numbers-and-conversion", 5, 6),
+        ("imports-and-library", 4, 6),
+        ("choices", 5, 6),
+        ("routes", 5, 6),
+        ("loop-control", 5, 6),
+        ("tools", 5, 6),
+    ):
+        module = build_learning_module(dictionary, module_id)
+        assert len(module.lesson_sections) == expected_sections
+        assert len(module.practice_tasks) == expected_tasks
+
+        for section in module.lesson_sections:
+            personal_source = (
+                f"@theme: {dictionary.theme}\n"
+                "@language: python\n"
+                "@version: 1\n"
+                "---\n"
+                f"{section.personal_example}\n"
+            )
+            assert _run_compiled(pipeline, personal_source, dictionary) == section.expected_output
+
+            real_stdout = io.StringIO()
+            with contextlib.redirect_stdout(real_stdout):
+                exec(section.real_python_example, {})  # noqa: S102 - verified lesson code.
+            assert real_stdout.getvalue() == section.expected_output
+
+
 def test_code_tasks_are_solvable_and_starters_do_not_pass():
     """Every module's write_code exercise must be PROVEN solvable: the hidden
     reference solution compiles and prints exactly the goal output, while the
@@ -161,10 +210,39 @@ def test_code_tasks_are_solvable_and_starters_do_not_pass():
 
             solution = code_task_reference_solution(dictionary, task.id)
             assert solution
-            assert _run_compiled(pipeline, solution, dictionary) == expected, (prompt, module_id)
+            assert _run_practice_source(
+                pipeline,
+                solution,
+                dictionary,
+                task.syntax_mode,
+            ) == expected, (prompt, module_id)
 
-            starter_stdout = _run_compiled(pipeline, task.starter_source, dictionary)
+            starter_stdout = _run_practice_source(
+                pipeline,
+                task.starter_source,
+                dictionary,
+                task.syntax_mode,
+            )
             assert starter_stdout != expected, (prompt, module_id, "starter already passes")
+
+
+def test_scaffold_fades_from_personal_tokens_to_standard_python():
+    path = build_learning_path(_dictionary("I am learning Python"))
+
+    assert [module.scaffold_stage for module in path.modules[:4]] == ["personal"] * 4
+    assert [module.scaffold_stage for module in path.modules[4:8]] == ["bridge"] * 4
+    assert [module.scaffold_stage for module in path.modules[8:11]] == ["python_forward"] * 3
+    assert [module.scaffold_stage for module in path.modules[11:]] == ["real_python"] * 3
+    assert [module.personal_support_percent for module in path.modules] == sorted(
+        [module.personal_support_percent for module in path.modules],
+        reverse=True,
+    )
+
+    for module in path.modules[8:]:
+        code_task = next(task for task in module.practice_tasks if task.kind == "write_code")
+        assert code_task.syntax_mode == "python"
+        assert not code_task.starter_source.startswith("@theme:")
+        assert "Write standard Python." in code_task.prompt
 
 
 def test_bridge_capstone_reference_is_real_python_and_solvable():

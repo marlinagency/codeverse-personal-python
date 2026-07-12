@@ -43,6 +43,7 @@ class PracticeTaskOut(BaseModel):
     starter_source: str | None = None
     hint: str = ""
     explanation: str = ""
+    syntax_mode: str = "personal"
 
 
 class LessonSectionOut(BaseModel):
@@ -72,6 +73,9 @@ class LearningModuleOut(BaseModel):
     expected_stdout: str
     practice_tasks: list[PracticeTaskOut]
     order: int
+    scaffold_stage: str
+    personal_support_percent: int
+    practice_syntax: str
     generated_code: str | None = None
     stdout: str | None = None
     compile_error: str | None = None

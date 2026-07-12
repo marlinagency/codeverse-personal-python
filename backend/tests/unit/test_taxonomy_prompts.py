@@ -179,6 +179,28 @@ def test_parse_theme_profile_output_normalizes_family_motif_aliases():
     assert profile.family_motifs["oop"] == ("vessel blueprint",)
 
 
+def test_parse_theme_profile_output_normalizes_compact_domain_lexicon():
+    raw = json.dumps(
+        {
+            "motifs": ["dispatch", "patrol"],
+            "tone": "direct",
+            "domain_lexicon": {
+                "entities": ["officer", "Officer", "patrol unit", "a phrase that is much too long to be useful"],
+                "actions": ["dispatch", "secure", "clear"],
+                "states": ["ready", "contained"],
+                "unknown_bucket": ["ignored"],
+            },
+        }
+    )
+
+    profile = parse_theme_profile_output(raw, "American SWAT operations")
+
+    assert profile.domain_lexicon["entities"] == ("officer", "patrol unit")
+    assert profile.domain_lexicon["actions"] == ("dispatch", "secure", "clear")
+    assert profile.domain_lexicon["states"] == ("ready", "contained")
+    assert "unknown_bucket" not in profile.domain_lexicon
+
+
 def test_parse_theme_profile_output_tolerates_fences_and_prose():
     raw = 'Here you go:\n```json\n{"motifs": ["a"], "tone": "t", "output_language": "en"}\n```'
     profile = parse_theme_profile_output(raw, "x")
@@ -240,4 +262,3 @@ def test_parse_batch_output_ignores_extra_names():
     raw = json.dumps({"mappings": {"upper": "x", "hallucinated": "y"}})
     result = parse_category_mapping_output(raw, batch)
     assert set(result.mappings) == {"upper"}
-

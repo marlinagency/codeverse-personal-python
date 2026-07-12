@@ -143,9 +143,35 @@ def _fallback_theme_profile(
             "data": family_motifs.get("data", ("memory card",))[0],
         },
         family_motifs=family_motifs,
+        domain_lexicon=_fallback_domain_lexicon(family_motifs),
+        domain_lexicon_source="fallback",
         raw_model_output=f'{{"fallback": true, "reason": {reason!r}}}',
         source="fallback",
     )
+
+
+def _fallback_domain_lexicon(
+    family_motifs: dict[str, tuple[str, ...]],
+) -> dict[str, tuple[str, ...]]:
+    sources = {
+        "entities": ("general", "oop"),
+        "actions": ("iteration", "function"),
+        "states": ("condition",),
+        "containers": ("data",),
+        "signals": ("output",),
+        "failures": ("error",),
+        "results": ("function", "general"),
+    }
+    return {
+        category: tuple(
+            dict.fromkeys(
+                motif
+                for family in families
+                for motif in family_motifs.get(family, ())
+            )
+        )[:8]
+        for category, families in sources.items()
+    }
 
 
 def _fallback_theme_assets(theme: str) -> tuple[str, dict[str, tuple[str, ...]]]:

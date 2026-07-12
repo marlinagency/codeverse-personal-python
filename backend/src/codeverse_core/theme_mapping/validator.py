@@ -228,9 +228,13 @@ def validate_personal_python_dictionary_quality(
         if not token:
             problems.append(f"{concept_id}: empty token")
             continue
-        if len(token) > 48:
+        compact_learning_token = concept_id in _PERSONAL_PYTHON_COMPACT_IDS
+        python_token = concept_id.startswith("py_")
+        max_length = 16 if compact_learning_token else (20 if python_token else 48)
+        max_parts = 2 if python_token else 6
+        if len(token) > max_length:
             problems.append(f"{concept_id}: token {token!r} is too long for learning UI")
-        if len(parts) > 6:
+        if len(parts) > max_parts:
             problems.append(f"{concept_id}: token {token!r} has too many snake_case parts")
         if part_set & _PERSONAL_BAD_TOKEN_PARTS:
             bad = ", ".join(sorted(part_set & _PERSONAL_BAD_TOKEN_PARTS))
@@ -267,6 +271,17 @@ _PERSONAL_PYTHON_CORE_IDS = (
     "py_kw_class",
     "py_kw_try",
     "py_kw_except",
+)
+
+_PERSONAL_PYTHON_COMPACT_IDS = frozenset(_PERSONAL_PYTHON_CORE_IDS) | frozenset(
+    {
+        "py_fn_str", "py_fn_int", "py_fn_float", "py_fn_round", "py_fn_abs", "py_fn_pow",
+        "py_kw_while", "py_kw_break", "py_kw_continue",
+        "py_kw_and", "py_kw_or", "py_kw_not", "py_kw_true", "py_kw_false", "py_kw_none",
+        "py_fn_set", "py_fn_tuple", "py_set_add", "py_set_discard", "py_set_union",
+        "py_kw_with", "py_kw_as", "py_kw_from", "py_fn_open", "py_file_read", "py_file_write",
+        "py_kw_finally", "py_fn_len", "py_list_append", "py_dict_get",
+    }
 )
 
 _PERSONAL_BAD_TOKEN_PARTS = frozenset(

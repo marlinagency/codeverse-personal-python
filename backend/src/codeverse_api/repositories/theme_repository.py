@@ -56,6 +56,10 @@ class ThemeRepository:
     def get(self, theme_dictionary_id: uuid.UUID) -> ThemeDictionaryRow | None:
         return self._db.get(ThemeDictionaryRow, theme_dictionary_id)
 
+    def deactivate(self, row: ThemeDictionaryRow) -> None:
+        row.is_active = False
+        self._db.add(row)
+
     def list_for_user(self, user_id: uuid.UUID) -> list[ThemeDictionaryRow]:
         return list(
             self._db.execute(

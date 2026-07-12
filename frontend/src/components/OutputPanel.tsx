@@ -8,6 +8,10 @@ interface Diagnostic {
   col?: number;
   severity?: string;
   stage?: string;
+  personal_source?: string | null;
+  python_source?: string | null;
+  personal_token?: string | null;
+  python_token?: string | null;
 }
 
 interface ExecutionResult {
@@ -150,6 +154,20 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ result, isLoading }) =
             {line !== undefined && (
               <div className="text-xs text-red-400 font-mono">
                 Line {line}, Column {col}
+              </div>
+            )}
+            {result.diagnostic_error?.personal_source && (
+              <div className="diagnostic-bridge">
+                <div><small>Your line</small><code>{result.diagnostic_error.personal_source}</code></div>
+                <span>-&gt;</span>
+                <div><small>Python sees</small><code>{result.diagnostic_error.python_source}</code></div>
+              </div>
+            )}
+            {result.diagnostic_error?.personal_token && result.diagnostic_error.python_token && (
+              <div className="diagnostic-token-map">
+                <code>{result.diagnostic_error.personal_token}</code>
+                <span>-&gt;</span>
+                <code>{result.diagnostic_error.python_token}</code>
               </div>
             )}
           </div>

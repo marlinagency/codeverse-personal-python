@@ -19,6 +19,23 @@ export interface Diagnostic {
   col: number
   severity: 'error' | 'warning'
   stage: string
+  personal_source: string | null
+  python_source: string | null
+  personal_token: string | null
+  python_token: string | null
+}
+
+export interface TokenReplacement {
+  personal_token: string
+  python_token: string
+  col: number
+}
+
+export interface TranslationTraceLine {
+  line: number
+  personal_source: string
+  python_source: string
+  replacements: TokenReplacement[]
 }
 
 export interface CompileResult {
@@ -27,6 +44,7 @@ export interface CompileResult {
   target_language: TargetLanguage | null
   warnings: Diagnostic[]
   error: Diagnostic | null
+  translation_trace: TranslationTraceLine[]
 }
 
 export interface ExecutionRunResult {
@@ -43,6 +61,9 @@ export interface ExecutionRunResult {
   error_message_themed: string | null
   duration_ms: number | null
   created_at: string
+  generated_code: string | null
+  diagnostic_error: Diagnostic | null
+  translation_trace: TranslationTraceLine[]
 }
 
 /** Concept keys mirrored from codeverse_core.concepts.UniversalConcept — kept
@@ -115,6 +136,7 @@ export interface PracticeTask {
   starter_source: string | null
   hint: string
   explanation: string
+  syntax_mode: 'personal' | 'python'
 }
 
 export interface LessonSection {
@@ -144,6 +166,9 @@ export interface LearningModule {
   expected_stdout: string
   practice_tasks: PracticeTask[]
   order: number
+  scaffold_stage: 'personal' | 'bridge' | 'python_forward' | 'real_python'
+  personal_support_percent: number
+  practice_syntax: 'personal' | 'python'
   generated_code: string | null
   stdout: string | null
   compile_error: string | null
@@ -250,5 +275,20 @@ export interface ThemeDictionaryCatalog {
   total: number
   category_counts: Record<string, number>
   tier_counts: Record<string, number>
+  quality: ThemeDictionaryQuality
   entries: ThemeDictionaryEntry[]
+}
+
+export interface ThemeDictionaryQuality {
+  overall_score: number
+  grade: 'A' | 'B' | 'C' | 'D' | 'F'
+  brevity_score: number
+  uniqueness_score: number
+  diversity_score: number
+  semantic_score: number
+  max_token_length: number
+  max_token_parts: number
+  dominant_root_share: number
+  upgrade_recommended: boolean
+  issues: string[]
 }

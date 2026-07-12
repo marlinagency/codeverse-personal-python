@@ -355,8 +355,40 @@ class TaxonomyThemeDictionaryGenerator:
             enabled=False,
         )
 
+        # Reserve concise names for the concepts learners type most often
+        # before the long taxonomy tail can consume every strong theme motif.
+        compact_concepts = [
+            concept
+            for batch in batches
+            for concept in batch.concepts
+            if concept.canonical_name.casefold() in _COMPACT_LEARNING_CONCEPTS
+        ]
+        for concept in compact_concepts:
+            token = _unique_profile_token(
+                profile,
+                motif_slugs,
+                concept,
+                used_tokens,
+                all_canonical_names,
+                reserved_preferred_tokens,
+            )
+            token, rationale_text = _repair_mapping_quality(
+                profile,
+                concept,
+                token,
+                _profile_rationale(profile, concept, token),
+                used_tokens,
+                all_canonical_names,
+                reserved_preferred_tokens,
+            )
+            for concept_id in concept.concept_ids:
+                mappings[concept_id] = token
+                rationale[concept_id] = _profile_rationale(profile, concept, token)
+
         for batch in batches:
             for concept in batch.concepts:
+                if all(concept_id in mappings for concept_id in concept.concept_ids):
+                    continue
                 override = critical_overrides.get(concept.canonical_name)
                 if override is not None and _is_available_generated_token(
                     override.mappings[concept.canonical_name], used_tokens, all_canonical_names
@@ -583,7 +615,15 @@ def _profile_motif_slugs(profile: ThemeProfile, theme: str) -> tuple[str, ...]:
         for motifs in _family_motifs(profile).values()
         for motif in motifs
     ]
-    candidates = family_motifs + list(profile.motifs)
+    lexicon_words = [
+        word
+        for words in profile.domain_lexicon.values()
+        for word in words
+    ]
+    if _profile_is_trusted(profile):
+        candidates = list(profile.motifs) + lexicon_words + family_motifs
+    else:
+        candidates = family_motifs + lexicon_words + list(profile.motifs)
     slugs: list[str] = []
     seen: set[str] = set()
     for candidate in candidates:
@@ -674,6 +714,8 @@ def _harden_personal_profile(profile: ThemeProfile) -> ThemeProfile:
         if family not in concept_preferences and family_motifs.get(family):
             concept_preferences[family] = family_motifs[family][0]
 
+    domain_lexicon = _harden_domain_lexicon(profile, family_motifs)
+
     clean_theme = profile.clean_theme.strip() or backing_label
     clean_theme_parts = set(_identifier_parts(clean_theme))
     if (
@@ -700,8 +742,79 @@ def _harden_personal_profile(profile: ThemeProfile) -> ThemeProfile:
         motifs=tuple(motifs),
         concept_preferences=concept_preferences,
         family_motifs=family_motifs,
+        domain_lexicon=domain_lexicon,
         output_language=profile.output_language or "en",
     )
+
+
+_LEXICON_FAMILY_SOURCES: dict[str, tuple[str, ...]] = {
+    "condition": ("states", "entities"),
+    "iteration": ("actions", "entities"),
+    "function": ("actions", "results"),
+    "output": ("signals", "results"),
+    "data": ("containers", "entities"),
+    "oop": ("entities", "containers"),
+    "error": ("failures", "states"),
+    "general": ("entities", "actions", "states"),
+}
+
+_LEXICON_CATEGORY_FAMILIES: dict[str, tuple[str, ...]] = {
+    "entities": ("general", "oop"),
+    "actions": ("iteration", "function"),
+    "states": ("condition",),
+    "containers": ("data",),
+    "signals": ("output",),
+    "failures": ("error",),
+    "results": ("function", "general"),
+}
+
+
+def _harden_domain_lexicon(
+    profile: ThemeProfile,
+    family_motifs: dict[str, tuple[str, ...]],
+) -> dict[str, tuple[str, ...]]:
+    """Build a short semantic vocabulary even when the model omits a bucket."""
+    lexicon: dict[str, tuple[str, ...]] = {}
+    for category, fallback_families in _LEXICON_CATEGORY_FAMILIES.items():
+        candidates = [*profile.domain_lexicon.get(category, ())]
+        candidates.extend(
+            motif
+            for family in fallback_families
+            for motif in family_motifs.get(family, ())
+        )
+        lexicon[category] = tuple(_compact_lexicon_entries(candidates, limit=8))
+    return lexicon
+
+
+def _compact_lexicon_entries(values: Iterable[str], *, limit: int) -> list[str]:
+    entries: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        slug = _identifier_slug(value)
+        if (
+            not slug
+            or len(slug) > 24
+            or len(slug.split("_")) > 2
+            or _is_weak_motif_slug(slug)
+            or slug in seen
+        ):
+            continue
+        entries.append(slug.replace("_", " "))
+        seen.add(slug)
+        if len(entries) == limit:
+            break
+    return entries
+
+
+def _lexicon_family_motifs(profile: ThemeProfile) -> dict[str, tuple[str, ...]]:
+    return {
+        family: tuple(
+            word
+            for category in categories
+            for word in profile.domain_lexicon.get(category, ())
+        )
+        for family, categories in _LEXICON_FAMILY_SOURCES.items()
+    }
 
 
 def _profile_backing_assets(profile: ThemeProfile) -> tuple[str, dict[str, tuple[str, ...]]]:
@@ -929,6 +1042,7 @@ def _family_motifs(profile: ThemeProfile) -> dict[str, tuple[str, ...]]:
         family: list(motifs)
         for family, motifs in known_families.items()
     }
+    lexicon_families = _lexicon_family_motifs(profile)
     for key, motifs in profile.family_motifs.items():
         family = _normalize_family_name(key)
         if family is None:
@@ -955,6 +1069,15 @@ def _family_motifs(profile: ThemeProfile) -> dict[str, tuple[str, ...]]:
                     families[family].append(value)
             else:
                 families[family].insert(0, value)
+    if _profile_is_trusted(profile) and profile.domain_lexicon_source == "llm":
+        for family, motifs in lexicon_families.items():
+            cleaned = [motif for motif in motifs if _strong_motif(motif)]
+            if not cleaned:
+                continue
+            families.setdefault(family, [])
+            families[family] = cleaned + [
+                motif for motif in families[family] if motif not in cleaned
+            ]
 
     generic = tuple(profile.motifs)
     if generic:
@@ -1274,13 +1397,74 @@ def _repair_mapping_quality(
     if not _quality_issues(profile, concept, token, rationale, all_canonical_names):
         return token, rationale
 
+    original_key = _fold(token)
+    original_owner = used_tokens.get(original_key)
+    if original_owner == concept.canonical_name:
+        used_tokens.pop(original_key)
+
     motif_slugs = _profile_motif_slugs(profile, profile.clean_theme or profile.theme)
     semantic = _semantic_slug(concept.canonical_name)
     compact_semantic = _compact_slug(semantic)
+    compact_cue = _COMPACT_ROLE_CUES.get(concept.canonical_name.casefold(), compact_semantic)
     preferred_motif = _motif_for_concept(motif_slugs, concept, profile)
     preferred_known = _preferred_known_token(profile, concept)
+    grounding_motifs: Iterable[str] = motif_slugs
+    if _profile_is_trusted(profile):
+        if profile.domain_lexicon_source == "llm":
+            grounding_motifs = (
+                word
+                for words in profile.domain_lexicon.values()
+                for word in words
+            )
+        else:
+            anchor_parts = set(
+                _identifier_parts(
+                    f"{profile.clean_theme} {profile.primary_world}"
+                )
+            )
+            anchored = tuple(
+                motif
+                for motif in profile.motifs
+                if _compact_slug(_identifier_slug(motif)) in anchor_parts
+            )
+            grounding_motifs = anchored or profile.motifs[:8]
+    primary_motifs = tuple(
+        dict.fromkeys(
+            compact
+            for motif in grounding_motifs
+            if (compact := _compact_slug(_identifier_slug(motif)))
+        )
+    )
+    fallback_motifs = tuple(
+        motif
+        for motif in dict.fromkeys(_compact_slug(item) for item in motif_slugs)
+        if motif not in primary_motifs
+    )
+
+    def rotated(values: tuple[str, ...], salt: str) -> tuple[str, ...]:
+        if not values:
+            return ()
+        start = _stable_index(
+            concept.canonical_name,
+            concept.category,
+            concept.kind,
+            salt,
+            modulo=len(values),
+        )
+        return tuple(
+            values[(start + offset) % len(values)]
+            for offset in range(len(values))
+        )
+    compact_motifs = rotated(primary_motifs, "primary") + rotated(
+        fallback_motifs, "fallback"
+    )
     candidates = [
         preferred_known or "",
+        _compact_slug(preferred_known or ""),
+        *(f"{motif}_{compact_cue}" for motif in compact_motifs),
+        *(f"{motif}_{compact_semantic}" for motif in compact_motifs),
+        _compact_slug(preferred_motif),
+        *compact_motifs,
         preferred_motif,
         f"{preferred_motif}_{compact_semantic}",
         f"{preferred_motif}_{semantic}",
@@ -1304,6 +1488,8 @@ def _repair_mapping_quality(
             used_tokens[_fold(repaired)] = concept.canonical_name
             return repaired, _profile_rationale(profile, concept, repaired)
 
+    if original_owner == concept.canonical_name:
+        used_tokens[original_key] = original_owner
     return token, _profile_rationale(profile, concept, token)
 
 
@@ -1320,7 +1506,11 @@ def _quality_issues(
     raw_prompt = profile.theme.casefold()
     rationale_folded = rationale.casefold()
 
-    if not token or len(token.split("_")) > 3 or len(token) > 36:
+    compact_learning_token = folded_name in _COMPACT_LEARNING_CONCEPTS
+    python_token = concept.language == "python"
+    max_parts = 2 if python_token else 3
+    max_length = 16 if compact_learning_token else (20 if python_token else 36)
+    if not token or len(token.split("_")) > max_parts or len(token) > max_length:
         issues.append("token too long")
     if folded_token in all_canonical_names or folded_token == folded_name:
         issues.append("copies canonical name")
@@ -1332,13 +1522,24 @@ def _quality_issues(
         issues.append("technical token part")
     if token_parts & _GENERIC_TOKEN_PARTS:
         issues.append("generic token part")
+    required_cue = _COMPACT_ROLE_CUES.get(folded_name)
+    if (
+        python_token
+        and not compact_learning_token
+        and required_cue
+        and required_cue not in token_parts
+    ):
+        issues.append("weak Python behavior cue")
     if any(bad in folded_token for bad in _BAD_TOKEN_SUBSTRINGS):
         issues.append("generic token substring")
     if (
         folded_name in token_parts
         or (folded_name == "iter" and "iter" in folded_token)
         or (folded_name == "dict" and "dictionary" in token_parts)
-    ) and folded_name not in _ALLOWED_SEMANTIC_NAME_PARTS:
+    ) and (
+        folded_name in _COMPACT_LEARNING_CONCEPTS
+        and folded_name not in _ALLOWED_SEMANTIC_NAME_PARTS
+    ):
         issues.append("blindly appends canonical name")
     if raw_prompt and len(raw_prompt) > 20 and raw_prompt in rationale_folded:
         issues.append("rationale includes raw prompt")
@@ -1425,6 +1626,14 @@ def _profile_rationale(
     folded = concept.canonical_name.casefold()
     if folded in _RATIONALE_TEMPLATES:
         return _RATIONALE_TEMPLATES[folded].format(motif=motif, theme=_theme_label(profile))
+    if concept.language == "python" and concept.hint.strip():
+        hint = re.sub(
+            rf"^Represents the Python (?:built-in|keyword|method) [`']?{re.escape(concept.canonical_name)}(?:\(\))?[`']?,?\s*which\s*",
+            "",
+            concept.hint.strip(),
+            flags=re.IGNORECASE,
+        ).rstrip(".")
+        return f"{motif} is the memory cue for the operation that {hint}."
     family = _concept_family(concept)
     return _family_rationale(family, motif, concept.canonical_name)
 
@@ -2280,6 +2489,12 @@ _SEMANTIC_SLUGS.update(
 
 _RATIONALE_TEMPLATES.update(
     {
+        "bytearray": "{motif} cues a mutable sequence of raw bytes.",
+        "bytes": "{motif} cues an immutable packet of raw bytes.",
+        "callable": "{motif} cues checking whether a value can be called.",
+        "chr": "{motif} cues turning a Unicode number into one character.",
+        "compile": "{motif} cues turning source text into executable code.",
+        "complex": "{motif} cues creating a number with real and imaginary parts.",
         "iter": "Uses {motif} for turning an object into a step-by-step route.",
         "next": "Uses {motif} for pulling the next item from an iterator.",
         "enumerate": "Uses {motif} for walking items while numbering each step.",
@@ -2374,6 +2589,53 @@ _CRITICAL_PYTHON_CONCEPTS = frozenset(
         "issubclass", "type", "super", "open", "read", "write",
     }
 )
+
+_COMPACT_LEARNING_CONCEPTS = _CRITICAL_PYTHON_CONCEPTS | frozenset(
+    {
+        "str", "int", "float", "round", "abs", "pow",
+        "and", "or", "not", "true", "false", "none",
+        "discard", "union", "with", "as", "from",
+    }
+)
+
+_COMPACT_ROLE_CUES = {
+    "def": "action", "return": "result",
+    "if": "check", "elif": "alternate", "else": "fallback",
+    "for": "route", "in": "inside", "while": "repeat",
+    "break": "stop", "continue": "skip",
+    "print": "signal", "input": "request", "range": "span", "len": "count",
+    "str": "text", "int": "whole", "float": "decimal", "round": "precision",
+    "abs": "distance", "pow": "power",
+    "list": "sequence", "dict": "record", "set": "unique", "tuple": "fixed",
+    "append": "insert", "remove": "drop", "get": "lookup", "keys": "fields",
+    "values": "contents", "items": "entries", "add": "insert",
+    "discard": "release", "union": "merge",
+    "class": "blueprint", "type": "kind", "super": "parent",
+    "isinstance": "kindcheck", "issubclass": "lineage",
+    "open": "access", "read": "inspect", "write": "record", "close": "seal",
+    "with": "context", "as": "alias", "from": "source", "import": "load",
+    "try": "attempt", "except": "recover", "finally": "cleanup",
+    "raise": "alert", "assert": "verify",
+    "iter": "route", "next": "advance", "enumerate": "number",
+    "zip": "pair", "map": "apply", "filter": "select",
+    "ascii": "safe", "bin": "binary", "bytearray": "mutable",
+    "bytes": "packet", "callable": "ready", "chr": "glyph",
+    "compile": "build", "complex": "imaginary", "delattr": "unset",
+    "dir": "names", "divmod": "split", "eval": "evaluate",
+    "exec": "execute", "format": "shape", "frozenset": "frozen",
+    "getattr": "fetch", "globals": "global", "hasattr": "has",
+    "hex": "hex", "id": "identity", "locals": "local",
+    "memoryview": "view", "object": "base", "oct": "octal",
+    "ord": "ordinal", "reversed": "reverse", "setattr": "assign",
+    "slice": "segment", "sorted": "order", "vars": "attributes",
+    "isalnum": "alphanumeric", "isalpha": "alphabetic",
+    "isascii": "ascii", "isdecimal": "decimal", "isdigit": "digit",
+    "isidentifier": "identifier", "islower": "lowercase",
+    "isnumeric": "numeric", "isprintable": "printable",
+    "isspace": "whitespace", "istitle": "titlecase",
+    "isupper": "uppercase", "startswith": "prefix", "endswith": "suffix",
+    "readable": "readable", "seekable": "seekable", "writable": "writable",
+}
 
 _CONTROL_FLOW_CONCEPTS = frozenset(
     {"if", "elif", "else", "for", "in", "while", "break", "continue", "match", "case"}
