@@ -50,6 +50,7 @@ def build_amd_provider(settings: Settings) -> OpenAICompatibleProvider:
         base_url=settings.amd_base_url,
         api_key="not-needed",
         model=settings.amd_model,
+        timeout_seconds=settings.amd_timeout_seconds,
     )
 
 

@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     amd_enabled: bool = False
     amd_base_url: str = "http://172.18.0.1:8001/v1"
     amd_model: str = "codeverse-student"
+    amd_timeout_seconds: float = 25.0
 
     # --- Database ---
     database_url: str = "postgresql+psycopg://codeverse:codeverse@localhost:5432/codeverse"

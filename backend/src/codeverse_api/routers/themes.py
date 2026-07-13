@@ -58,20 +58,35 @@ def generate_theme(
     # never breaks for the visitor.
     active_generator = generator
     active_provider = provider
-    if body.use_amd and settings.amd_enabled:
+    using_amd = body.use_amd and settings.amd_enabled
+    if using_amd:
         active_provider = build_amd_provider(settings)
-        active_generator = TaxonomyThemeDictionaryGenerator(active_provider)  # type: ignore
+        # Curated chips need one real, attributable AMD inference. A single
+        # attempt keeps the demo responsive; the deterministic concept engine
+        # expands that profile into the complete Python dictionary.
+        active_generator = TaxonomyThemeDictionaryGenerator(  # type: ignore
+            active_provider,
+            max_attempts=1,
+        )
 
-    def _run(gen: TaxonomyThemeDictionaryGenerator):
+    def _run(gen: TaxonomyThemeDictionaryGenerator, *, amd_fast_path: bool = False):
         return gen.generate_profile_seeded(
             body.theme,
             output_language=body.output_language or "en",
             languages=("python",),
             clarifying_answers=body.clarifying_answers,
+            # The AMD student supplies the semantic profile. Generating a
+            # second 8k-token override batch adds latency without proving any
+            # additional hardware usage.
+            critical_overrides_enabled=not amd_fast_path,
+            # Never stamp deterministic fallback output as AMD-generated. If
+            # the student fails, let this route use and record the real primary
+            # provider below.
+            profile_fallback_on_failure=not amd_fast_path,
         )
 
     try:
-        dictionary = _run(active_generator)
+        dictionary = _run(active_generator, amd_fast_path=using_amd)
     except (ThemeDictionaryValidationError, TaxonomyGenerationError, LLMProviderError) as exc:
         if active_generator is generator:
             # already the primary provider — surface the real error
@@ -175,36 +190,13 @@ def get_clarifying_questions(
     body: ClarifyingQuestionsRequest,
     user_id: uuid.UUID = Depends(get_current_user_id),
     provider: LLMProvider = Depends(get_llm_provider),
-    settings: Settings = Depends(get_settings),
 ) -> ClarifyingQuestionsOut:
-    active_provider = provider
-    if body.use_amd and settings.amd_enabled:
-        active_provider = build_amd_provider(settings)
-
     try:
-        questions = generate_clarifying_questions(active_provider, body.theme)
+        # Clarifying questions are an onboarding concern, not the artifact we
+        # claim as AMD-generated. Keep them on the primary low-latency model;
+        # the curated chip itself goes directly to the AMD generation route.
+        questions = generate_clarifying_questions(provider, body.theme)
     except (TaxonomyGenerationError, LLMProviderError) as exc:
-        if active_provider is not provider:
-            # AMD failed — retry with the primary provider
-            try:
-                questions = generate_clarifying_questions(provider, body.theme)
-            except TaxonomyGenerationError as exc2:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail={
-                        "message": "clarifying questions could not be generated",
-                        "problems": [str(exc2)],
-                    },
-                ) from exc2
-            except LLMProviderError as exc2:
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail={
-                        "message": "the LLM provider did not return valid clarifying questions",
-                        "problems": [str(exc2)],
-                    },
-                ) from exc2
-            return _questions_out(questions)
         raise _questions_error(exc)
 
     return _questions_out(questions)

@@ -318,6 +318,9 @@ class TaxonomyThemeDictionaryGenerator:
         languages: tuple[Language, ...] = ("python", "sql"),
         concepts: Iterable[MappableConcept] | None = None,
         clarifying_answers: dict[str, str] | None = None,
+        *,
+        critical_overrides_enabled: bool = True,
+        profile_fallback_on_failure: bool = True,
     ) -> TaxonomyThemeDictionary:
         """Fast app path: use the LLM once for theme motifs, then produce a
         complete, validated taxonomy dictionary deterministically.
@@ -334,7 +337,7 @@ class TaxonomyThemeDictionaryGenerator:
             theme,
             output_language=output_language,
             max_attempts=self._max_attempts,
-            fallback_on_failure=True,
+            fallback_on_failure=profile_fallback_on_failure,
             clarifying_answers=clarifying_answers,
         )
         profile = _harden_personal_profile(profile)
@@ -357,7 +360,7 @@ class TaxonomyThemeDictionaryGenerator:
             profile,
             batches,
             all_canonical_names,
-            enabled=True,
+            enabled=critical_overrides_enabled,
         )
 
         # Reserve concise names for the concepts learners type most often

@@ -186,13 +186,14 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
     await beginWizard(newThemePrompt);
   };
 
-  //: Clicking a curated chip: pin the prompt, route the whole flow to the
-  //: AMD-hosted model, and start the same wizard as a normal submit.
+  // Curated chips match the student's fine-tuning distribution, so they go
+  // straight to one AMD profile inference. Free-form prompts still use the
+  // clarifying wizard and the primary model.
   const startFromChip = async (label: string) => {
     if (isGenerating || stage !== 'idle') return;
     useAmdRef.current = true;
     setNewThemePrompt(label);
-    await beginWizard(label);
+    await runGenerate(label, {});
   };
 
   const beginWizard = async (themeText: string) => {
@@ -281,6 +282,7 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
     const isLoadingQuestions = stage === 'loading-questions';
 
     if (isLoadingQuestions || isGenerating || loadingQuestionsSuccess || generationSuccess) {
+      const isAmdGeneration = useAmdRef.current && (isGenerating || generationSuccess);
       let step1Status: 'complete' | 'active' | 'upcoming' = 'complete';
       let step2Status: 'complete' | 'active' | 'upcoming' = 'upcoming';
       let step3Status: 'complete' | 'active' | 'upcoming' = 'upcoming';
@@ -293,8 +295,12 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
       } else if (isLoadingQuestions) {
         step2Status = 'active';
       } else if (isGenerating) {
-        step2Status = 'complete';
-        step3Status = 'active';
+        if (isAmdGeneration) {
+          step2Status = 'active';
+        } else {
+          step2Status = 'complete';
+          step3Status = 'active';
+        }
       }
 
       const renderStepIcon = (status: 'complete' | 'active' | 'upcoming') => {
@@ -316,25 +322,31 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
       return createPortal(
         <div className="modal-overlay">
           <div className="cv-loading-modal">
-            <span className="cv-loading-title">BUILDING YOUR CODEVERSE</span>
+            <span className="cv-loading-title">
+              {isAmdGeneration ? 'RUNNING ON AMD INSTINCT' : 'BUILDING YOUR CODEVERSE'}
+            </span>
             
             <div className="cv-loading-illustration">
               <div className="juggling-dino-loading" />
             </div>
 
             <p className="cv-loading-subtitle">
-              We're turning your world into a personalized Python learning experience.
+              {isAmdGeneration
+                ? 'Our fine-tuned Gemma student is creating the semantic profile for your Python vocabulary.'
+                : "We're turning your world into a personalized Python learning experience."}
             </p>
 
             <div className="cv-loading-steps">
               <div className={`cv-loading-step ${step1Status}`}>
                 <span className="cv-step-icon">{renderStepIcon(step1Status)}</span>
-                <span className="cv-step-text">Understanding your theme</span>
+                <span className="cv-step-text">{isAmdGeneration ? 'AMD route selected' : 'Understanding your theme'}</span>
               </div>
               <div className={`cv-loading-step ${step2Status}`}>
                 <span className="cv-step-icon">{renderStepIcon(step2Status)}</span>
                 <span className="cv-step-text">
-                  {step2Status === 'active' ? 'Designing your questions...' : 'Designing your questions'}
+                  {isAmdGeneration
+                    ? (step2Status === 'active' ? 'Running codeverse-student...' : 'Gemma profile inference')
+                    : (step2Status === 'active' ? 'Designing your questions...' : 'Designing your questions')}
                 </span>
               </div>
               <div className={`cv-loading-step ${step3Status}`}>
@@ -349,7 +361,9 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
               <div className="cv-loading-progress-fill" style={{ width: `${progressPct}%` }} />
             </div>
 
-            <span className="cv-loading-footer">Usually takes less than 20 seconds</span>
+            <span className="cv-loading-footer">
+              {isAmdGeneration ? 'Live inference · codeverse-student · AMD Instinct' : 'Usually takes less than 20 seconds'}
+            </span>
           </div>
         </div>,
         document.body

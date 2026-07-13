@@ -99,6 +99,48 @@ def test_generate_theme_profile_fallback_recognizes_witcher_turkish_prompt():
     assert "witcher evreniyle" not in " ".join(profile.motifs).casefold()
 
 
+def test_profile_seeded_fast_path_can_skip_second_llm_batch():
+    profile = json.dumps(
+        {
+            "clean_theme": "Chess",
+            "primary_world": "Chess",
+            "motifs": ["board", "move", "signal", "rank"],
+            "tone": "strategic",
+            "output_language": "en",
+        }
+    )
+    provider = _StubProvider([profile])
+    concepts = [
+        _concept("if", kind="keyword", category="keywords", ids=("py_kw_if",)),
+        _concept("print", kind="builtin", category="builtins", ids=("py_fn_print",)),
+    ]
+
+    dictionary = TaxonomyThemeDictionaryGenerator(provider, max_attempts=1).generate_profile_seeded(
+        "chess",
+        languages=("python",),
+        concepts=concepts,
+        critical_overrides_enabled=False,
+        profile_fallback_on_failure=False,
+    )
+
+    assert len(provider.calls) == 1
+    assert dictionary.mappings["py_kw_if"]
+    assert dictionary.mappings["py_fn_print"]
+
+
+def test_profile_seeded_can_require_a_real_model_profile():
+    provider = _StubProvider(["not valid json"])
+
+    with pytest.raises(TaxonomyGenerationError, match="tema profili"):
+        TaxonomyThemeDictionaryGenerator(provider, max_attempts=1).generate_profile_seeded(
+            "chess",
+            languages=("python",),
+            concepts=[_concept("if", kind="keyword", category="keywords", ids=("py_kw_if",))],
+            critical_overrides_enabled=False,
+            profile_fallback_on_failure=False,
+        )
+
+
 # ------------------------------------------------------------- batch mapping
 
 
