@@ -4691,27 +4691,41 @@ body.use-custom-cursor * {
   cursor: none !important;
 }
 
-/* Fallback CSS cursors (standard 32px versions) when JS custom cursor is disabled */
-body:not(.use-custom-cursor) {
-  cursor: url('/cursors/cursor_normal_32.png') 0 0, auto;
+/* Image cursors are desktop-only. Touch browsers must never paint one after a tap. */
+@media (hover: hover) and (pointer: fine) {
+  body:not(.use-custom-cursor) {
+    cursor: url('/cursors/cursor_normal_32.png') 0 0, auto;
+  }
+  body:not(.use-custom-cursor) button,
+  body:not(.use-custom-cursor) a,
+  body:not(.use-custom-cursor) [role="button"],
+  body:not(.use-custom-cursor) .cursor-pointer,
+  body:not(.use-custom-cursor) .edu-tabs button,
+  body:not(.use-custom-cursor) .module-strip button,
+  body:not(.use-custom-cursor) .director-transport button,
+  body:not(.use-custom-cursor) .director-tools button {
+    cursor: url('/cursors/cursor_pointer_32.png') 10 0, pointer !important;
+  }
+  body:not(.use-custom-cursor) input[type="text"],
+  body:not(.use-custom-cursor) input[type="email"],
+  body:not(.use-custom-cursor) textarea,
+  body:not(.use-custom-cursor) .monaco-editor,
+  body:not(.use-custom-cursor) .monaco-mouse-cursor-text,
+  body:not(.use-custom-cursor) .practice-code-editor {
+    cursor: url('/cursors/cursor_text_32.png') 9 16, text !important;
+  }
 }
-body:not(.use-custom-cursor) button,
-body:not(.use-custom-cursor) a,
-body:not(.use-custom-cursor) [role="button"],
-body:not(.use-custom-cursor) .cursor-pointer,
-body:not(.use-custom-cursor) .edu-tabs button,
-body:not(.use-custom-cursor) .module-strip button,
-body:not(.use-custom-cursor) .director-transport button,
-body:not(.use-custom-cursor) .director-tools button {
-  cursor: url('/cursors/cursor_pointer_32.png') 10 0, pointer !important;
-}
-body:not(.use-custom-cursor) input[type="text"],
-body:not(.use-custom-cursor) input[type="email"],
-body:not(.use-custom-cursor) textarea,
-body:not(.use-custom-cursor) .monaco-editor,
-body:not(.use-custom-cursor) .monaco-mouse-cursor-text,
-body:not(.use-custom-cursor) .practice-code-editor {
-  cursor: url('/cursors/cursor_text_32.png') 9 16, text !important;
+
+@media (hover: none), (pointer: coarse) {
+  body.use-custom-cursor,
+  body.use-custom-cursor * {
+    cursor: auto !important;
+  }
+
+  .custom-cursor-container,
+  .custom-cursor-ripple {
+    display: none !important;
+  }
 }
 
 /* Custom JS Cursor layout */
@@ -4749,8 +4763,8 @@ body:not(.use-custom-cursor) .practice-code-editor {
   left: 0;
   top: 0;
   pointer-events: none;
-  width: 32px;
-  height: 32px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   border: 2px solid #fdcb1f;
   transform: translate(-50%, -50%) scale(0.1);
@@ -4765,7 +4779,7 @@ body:not(.use-custom-cursor) .practice-code-editor {
     border-width: 3px;
   }
   100% {
-    transform: translate(-50%, -50%) scale(1.5);
+    transform: translate(-50%, -50%) scale(1.25);
     opacity: 0;
     border-width: 1px;
   }

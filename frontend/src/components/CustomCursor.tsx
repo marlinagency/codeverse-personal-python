@@ -7,14 +7,32 @@ export const CustomCursor: React.FC = () => {
   });
   const [cursorType, setCursorType] = useState<'normal' | 'pointer' | 'text' | 'loading' | 'click'>('normal');
   const [isAppLoading, setIsAppLoading] = useState(false);
+  const [hasFinePointer, setHasFinePointer] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  );
   const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const mousePos = useRef({ x: 0, y: 0 });
   const rippleIdCounter = useRef(0);
+  const isActive = enabled && hasFinePointer;
+
+  // Touch-first devices use their native interaction model. Listening to the
+  // media query also handles a desktop mouse being connected or removed.
+  useEffect(() => {
+    const pointerQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const handlePointerCapability = (event: MediaQueryListEvent) => {
+      setHasFinePointer(event.matches);
+      if (!event.matches) setRipples([]);
+    };
+
+    setHasFinePointer(pointerQuery.matches);
+    pointerQuery.addEventListener('change', handlePointerCapability);
+    return () => pointerQuery.removeEventListener('change', handlePointerCapability);
+  }, []);
 
   // Sync body class
   useEffect(() => {
-    if (enabled) {
+    if (isActive) {
       document.body.classList.add('use-custom-cursor');
     } else {
       document.body.classList.remove('use-custom-cursor');
@@ -22,7 +40,7 @@ export const CustomCursor: React.FC = () => {
     return () => {
       document.body.classList.remove('use-custom-cursor');
     };
-  }, [enabled]);
+  }, [isActive]);
 
   // Listen to custom cursor toggles
   useEffect(() => {
@@ -47,7 +65,7 @@ export const CustomCursor: React.FC = () => {
 
   // Track position
   useEffect(() => {
-    if (!enabled) return;
+    if (!isActive) return;
 
     const handleMouseMove = (e: MouseEvent) => {
       mousePos.current = { x: e.clientX, y: e.clientY };
@@ -78,11 +96,11 @@ export const CustomCursor: React.FC = () => {
       document.removeEventListener('mouseleave', handleMouseLeave);
       document.removeEventListener('mouseenter', handleMouseEnter);
     };
-  }, [enabled]);
+  }, [isActive]);
 
   // Click ripple and state tracking
   useEffect(() => {
-    if (!enabled) return;
+    if (!isActive) return;
 
     const handleMouseDown = (e: MouseEvent) => {
       setCursorType('click');
@@ -108,7 +126,7 @@ export const CustomCursor: React.FC = () => {
       window.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [enabled]);
+  }, [isActive]);
 
   // Evaluate cursor state based on hovered elements
   const evaluateCursorType = () => {
@@ -143,7 +161,7 @@ export const CustomCursor: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!isActive) return;
 
     const handleMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -175,35 +193,35 @@ export const CustomCursor: React.FC = () => {
 
     window.addEventListener('mouseover', handleMouseOver);
     return () => window.removeEventListener('mouseover', handleMouseOver);
-  }, [enabled]);
+  }, [isActive]);
 
-  if (!enabled) return null;
+  if (!isActive) return null;
 
   // Decide image asset, scale, and hotspot offset
   let imgSrc = '/cursors/cursor_normal.png';
-  let cursorSize = '32px';
+  let cursorSize = '24px';
   let wrapperTransform = 'translate3d(0, 0, 0)';
 
   if (isAppLoading) {
     imgSrc = '/cursors/cursor_loading.png';
-    cursorSize = '38px'; // Slightly larger for the loading circle
+    cursorSize = '28px';
     wrapperTransform = 'translate3d(-50%, -50%, 0)';
   } else if (cursorType === 'click') {
     imgSrc = '/cursors/cursor_click.png';
-    cursorSize = '32px';
+    cursorSize = '24px';
     wrapperTransform = 'translate3d(0, 0, 0)';
   } else if (cursorType === 'pointer') {
     imgSrc = '/cursors/cursor_pointer.png';
-    cursorSize = '32px';
-    wrapperTransform = 'translate3d(-8px, 0, 0)'; // Aligns index finger tip for 32px height
+    cursorSize = '24px';
+    wrapperTransform = 'translate3d(-6px, 0, 0)';
   } else if (cursorType === 'text') {
     imgSrc = '/cursors/cursor_text.png';
-    cursorSize = '32px';
+    cursorSize = '24px';
     wrapperTransform = 'translate3d(-50%, -50%, 0)';
   } else {
     // Normal selection
     imgSrc = '/cursors/cursor_normal.png';
-    cursorSize = '32px';
+    cursorSize = '24px';
     wrapperTransform = 'translate3d(0, 0, 0)';
   }
 
