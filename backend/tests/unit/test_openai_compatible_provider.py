@@ -14,6 +14,9 @@ class _Response:
 
     def json(self) -> dict:
         return {
+            "id": "chatcmpl-cv-proof123",
+            "model": "codeverse-student",
+            "usage": {"prompt_tokens": 25, "completion_tokens": 10},
             "choices": [
                 {
                     "message": {"content": '{"clean_theme":"Chess","motifs":["board"]}'},
@@ -38,7 +41,7 @@ class _Client:
         return _Response()
 
 
-def test_provider_caps_generation_budget_for_student_models(monkeypatch):
+def test_provider_caps_generation_budget_and_logs_proof(monkeypatch, caplog):
     captured: dict = {}
     monkeypatch.setattr(
         "codeverse_core.theme_mapping.providers.openai_compatible.httpx.Client",
@@ -51,11 +54,15 @@ def test_provider_caps_generation_budget_for_student_models(monkeypatch):
         max_tokens_cap=160,
     )
 
-    provider.chat(
-        [{"role": "user", "content": "Build a profile"}],
-        temperature=0.7,
-        max_tokens=2048,
-    )
+    with caplog.at_level("INFO"):
+        provider.chat(
+            [{"role": "user", "content": "Build a profile"}],
+            temperature=0.7,
+            max_tokens=2048,
+        )
 
     assert captured["payload"]["max_tokens"] == 160
     assert "response_format" not in captured["payload"]
+    assert "response_id=chatcmpl-cv-proof123" in caplog.text
+    assert "response_model=codeverse-student" in caplog.text
+    assert "output_sha256=" in caplog.text

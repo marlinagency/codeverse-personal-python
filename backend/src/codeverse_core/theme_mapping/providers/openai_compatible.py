@@ -6,7 +6,10 @@ vLLM, LM Studio, ... Configure with base_url + api_key + model.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
+import time
 
 import httpx
 
@@ -19,6 +22,8 @@ from codeverse_core.theme_mapping.llm_provider import (
     ThemeMappingResponse,
     error_mapping_json,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAICompatibleProvider(LLMProvider):
@@ -77,6 +82,7 @@ class OpenAICompatibleProvider(LLMProvider):
         """Raw chat-completion call, public so higher-scale callers (e.g. the
         taxonomy batch generator, Adım 8) aren't limited to the two fixed
         capabilities on :class:`LLMProvider`."""
+        started_at = time.perf_counter()
         try:
             with httpx.Client(timeout=self._timeout) as client:
                 effective_max_tokens = (
@@ -100,7 +106,27 @@ class OpenAICompatibleProvider(LLMProvider):
                 data = resp.json()
         except httpx.HTTPError as exc:
             raise LLMProviderError(f"{self._label} request failed: {exc}") from exc
-        return self._extract_content(data)
+        content = self._extract_content(data)
+        elapsed_ms = round((time.perf_counter() - started_at) * 1000)
+        response_id = str(data.get("id", "unknown")) if isinstance(data, dict) else "unknown"
+        response_model = (
+            str(data.get("model", "unknown")) if isinstance(data, dict) else "unknown"
+        )
+        usage = data.get("usage", {}) if isinstance(data, dict) else {}
+        logger.info(
+            "LLM_INFERENCE_PROOF provider=%s requested_model=%s response_model=%s "
+            "response_id=%s latency_ms=%d prompt_tokens=%s completion_tokens=%s "
+            "output_sha256=%s",
+            self._label,
+            self._model,
+            response_model,
+            response_id,
+            elapsed_ms,
+            usage.get("prompt_tokens", "unknown") if isinstance(usage, dict) else "unknown",
+            usage.get("completion_tokens", "unknown") if isinstance(usage, dict) else "unknown",
+            hashlib.sha256(content.encode("utf-8")).hexdigest()[:16],
+        )
+        return content
 
     def _post_chat(
         self, client: httpx.Client, payload: dict[str, object]
