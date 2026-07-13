@@ -51,6 +51,7 @@ def build_amd_provider(settings: Settings) -> OpenAICompatibleProvider:
         api_key="not-needed",
         model=settings.amd_model,
         timeout_seconds=settings.amd_timeout_seconds,
+        max_tokens_cap=settings.amd_max_tokens,
     )
 
 

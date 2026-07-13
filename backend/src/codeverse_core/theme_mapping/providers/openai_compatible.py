@@ -29,12 +29,14 @@ class OpenAICompatibleProvider(LLMProvider):
         model: str,
         timeout_seconds: float = 60.0,
         provider_label: str = "openai_compatible",
+        max_tokens_cap: int | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         self._model = model
         self._timeout = timeout_seconds
         self._label = provider_label
+        self._max_tokens_cap = max_tokens_cap
 
     @property
     def provider_name(self) -> str:
@@ -77,13 +79,18 @@ class OpenAICompatibleProvider(LLMProvider):
         capabilities on :class:`LLMProvider`."""
         try:
             with httpx.Client(timeout=self._timeout) as client:
+                effective_max_tokens = (
+                    min(max_tokens, self._max_tokens_cap)
+                    if self._max_tokens_cap is not None
+                    else max_tokens
+                )
                 payload = {
                     "model": self._model,
                     "messages": messages,
                     "temperature": temperature,
-                    "max_tokens": max_tokens,
+                    "max_tokens": effective_max_tokens,
                 }
-                if max_tokens > 1000:
+                if effective_max_tokens > 1000:
                     payload["response_format"] = {"type": "json_object"}
                 resp = self._post_chat(client, payload)
                 if resp.status_code == 400 and "response_format" in resp.text:

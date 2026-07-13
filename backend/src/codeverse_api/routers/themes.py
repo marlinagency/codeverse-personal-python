@@ -103,7 +103,21 @@ def generate_theme(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={"message": "theme dictionary could not be generated", "problems": problems},
             ) from exc
-        # AMD path failed — fall back to the primary provider
+        if using_amd:
+            # AMD chips are a hardware/model proof path. Never disguise an
+            # unavailable student model by silently returning Fireworks data.
+            problems = getattr(exc, "problems", [str(exc)])
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    "message": "the AMD-hosted codeverse-student model did not complete the request",
+                    "problems": problems,
+                    "provider": "openai_compatible",
+                    "model": settings.amd_model,
+                },
+            ) from exc
+
+        # Defensive fallback for any future non-AMD secondary provider.
         active_generator = generator
         active_provider = provider
         try:
