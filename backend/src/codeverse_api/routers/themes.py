@@ -343,6 +343,8 @@ def get_theme_dictionary_catalog(
     return ThemeDictionaryCatalogOut(
         theme_dictionary_id=theme_dictionary_id,
         theme_name=row.theme_name,
+        llm_provider=row.llm_provider,
+        llm_model=row.llm_model,
         total=len(entries),
         category_counts=dict(sorted(category_counts.items())),
         tier_counts=dict(sorted(tier_counts.items())),

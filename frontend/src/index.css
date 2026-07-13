@@ -4454,6 +4454,15 @@ textarea:focus {
 .edu-dictionary-heading p { margin: 6px 0 0; color: #59616a; font-size: 13px; }
 .edu-dictionary-heading .edu-dino { flex: none; width: 78px; height: 78px; }
 
+.edu-provenance { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding: 11px 16px; border: 1px solid rgba(17, 24, 32, 0.18); border-radius: 7px; background: rgba(255, 255, 255, 0.5); font-size: 12px; color: #414b53; }
+.edu-provenance code { padding: 1px 6px; border-radius: 4px; background: rgba(17, 24, 32, 0.07); font: 600 11px var(--font-mono); }
+.edu-provenance strong { color: #111820; }
+.edu-provenance-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: #9aa2a8; }
+.edu-provenance.amd { border-color: rgba(237, 28, 36, 0.4); background: rgba(237, 28, 36, 0.05); color: #2b1516; }
+.edu-provenance.amd strong { color: #ED1C24; }
+.edu-provenance.amd code { background: rgba(237, 28, 36, 0.1); color: #b3161c; }
+.edu-provenance.amd .edu-provenance-dot { background: #ED1C24; box-shadow: 0 0 0 3px rgba(237, 28, 36, 0.18); animation: amd-spark-pulse 1.8s ease-in-out infinite; }
+
 .edu-dictionary-tryit { margin-bottom: 22px; padding: 20px 22px; border: 1px solid rgba(17, 24, 32, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.48); }
 .edu-dictionary-tryit h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 600; }
 .edu-dictionary-tryit h3 svg { width: 16px; color: #1769df; }

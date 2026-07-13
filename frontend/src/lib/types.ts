@@ -306,6 +306,8 @@ export interface ThemeDictionaryEntry {
 export interface ThemeDictionaryCatalog {
   theme_dictionary_id: string
   theme_name: string
+  llm_provider: string
+  llm_model: string
   total: number
   category_counts: Record<string, number>
   tier_counts: Record<string, number>

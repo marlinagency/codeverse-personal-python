@@ -97,6 +97,11 @@ class ThemeDictionaryQualityOut(BaseModel):
 class ThemeDictionaryCatalogOut(BaseModel):
     theme_dictionary_id: uuid.UUID
     theme_name: str
+    #: which model actually produced this dictionary — surfaced in the UI as a
+    #: provenance badge. AMD chip generations record "codeverse-student"; a
+    #: fallback to the primary provider records e.g. the Fireworks model.
+    llm_provider: str
+    llm_model: str
     total: int
     category_counts: dict[str, int]
     tier_counts: dict[str, int]
