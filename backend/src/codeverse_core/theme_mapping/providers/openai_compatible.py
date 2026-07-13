@@ -24,6 +24,7 @@ from codeverse_core.theme_mapping.llm_provider import (
 )
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class OpenAICompatibleProvider(LLMProvider):
