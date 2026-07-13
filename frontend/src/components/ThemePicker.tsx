@@ -336,6 +336,16 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({
                 : "We're turning your world into a personalized Python learning experience."}
             </p>
 
+            {isAmdGeneration && (
+              <div className="cv-amd-student-notice" role="note">
+                <strong>Student model notice</strong>
+                <span>
+                  This experimental Gemma model may produce less consistent vocabulary than our
+                  production Fireworks model. If AMD is unavailable, CodeVerse continues with Fireworks.
+                </span>
+              </div>
+            )}
+
             <div className="cv-loading-steps">
               <div className={`cv-loading-step ${step1Status}`}>
                 <span className="cv-step-icon">{renderStepIcon(step1Status)}</span>

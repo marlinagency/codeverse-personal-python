@@ -588,6 +588,36 @@ select:focus, input[type="text"]:focus, textarea:focus {
   max-width: 320px;
 }
 
+.cv-amd-student-notice {
+  width: 100%;
+  max-width: 340px;
+  margin: -10px 0 24px;
+  padding: 10px 12px;
+  border-left: 3px solid #d84a2f;
+  border-radius: 4px;
+  background: #fff5ee;
+  color: #5f3027;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.cv-amd-student-notice strong,
+.cv-amd-student-notice span {
+  display: block;
+}
+
+.cv-amd-student-notice strong {
+  margin-bottom: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.cv-amd-student-notice span {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .cv-loading-steps {
   display: flex;
   flex-direction: column;
