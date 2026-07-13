@@ -23,8 +23,7 @@ from codeverse_core.theme_mapping.llm_provider import (
     error_mapping_json,
 )
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger = logging.getLogger("uvicorn.error")
 
 
 class OpenAICompatibleProvider(LLMProvider):
