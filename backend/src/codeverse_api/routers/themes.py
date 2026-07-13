@@ -52,10 +52,8 @@ def generate_theme(
     provider: LLMProvider = Depends(get_llm_provider),
     settings: Settings = Depends(get_settings),
 ) -> ThemeDictionaryOut:
-    # Curated chips route to the AMD-hosted model (fine-tuned on these exact
-    # prompts). The primary provider is the fallback: if AMD is unreachable or
-    # returns something invalid, we transparently retry with it so the site
-    # never breaks for the visitor.
+    # Curated chips route exclusively to the AMD-hosted student model. Free
+    # text continues to use Fireworks through the primary generator below.
     active_generator = generator
     active_provider = provider
     using_amd = body.use_amd and settings.amd_enabled
@@ -80,9 +78,11 @@ def generate_theme(
             # additional hardware usage.
             critical_overrides_enabled=not amd_fast_path,
             # Never stamp deterministic fallback output as AMD-generated. If
-            # the student fails, let this route use and record the real primary
-            # provider below.
+            # the student fails, return a visible AMD error instead.
             profile_fallback_on_failure=not amd_fast_path,
+            # Gemma only needs to author the semantic seed. The deterministic
+            # concept engine expands it into the complete Python dictionary.
+            compact_profile_prompt=amd_fast_path,
         )
 
     try:

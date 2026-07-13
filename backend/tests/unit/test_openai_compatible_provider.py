@@ -48,7 +48,7 @@ def test_provider_caps_generation_budget_for_student_models(monkeypatch):
         base_url="http://student.test/v1",
         api_key="unused",
         model="codeverse-student",
-        max_tokens_cap=640,
+        max_tokens_cap=160,
     )
 
     provider.chat(
@@ -57,5 +57,5 @@ def test_provider_caps_generation_budget_for_student_models(monkeypatch):
         max_tokens=2048,
     )
 
-    assert captured["payload"]["max_tokens"] == 640
+    assert captured["payload"]["max_tokens"] == 160
     assert "response_format" not in captured["payload"]

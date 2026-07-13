@@ -420,6 +420,40 @@ def build_theme_profile_messages(
     ]
 
 
+COMPACT_THEME_PROFILE_SYSTEM_PROMPT = """\
+Return ONLY one minified JSON object for a personal Python vocabulary profile.
+Use this exact shape: {"clean_theme":"...","motifs":["..."],"tone":"...","output_language":"en"}.
+Give exactly 6 distinct, concrete English motifs from the requested world.
+Each motif must be one or two short words. Prefer recognizable objects, roles,
+actions, places, or signals. Never use Python terms, generic programming words,
+learner filler, explanations, markdown, or extra keys.
+"""
+
+
+def build_compact_theme_profile_messages(
+    theme: str,
+    output_language: str | None = None,
+    clarifying_answers: dict[str, str] | None = None,
+) -> list[dict[str, str]]:
+    """Small profile contract for latency-sensitive student models.
+
+    The deterministic concept engine hardens these four model-authored fields
+    into the complete family/lexicon profile. This keeps the AMD proof path a
+    real inference while avoiding the large few-shot prompt used by Fireworks.
+    """
+    user = f"Theme: {theme}\nToken language: {output_language or 'en'}"
+    if clarifying_answers:
+        details = "; ".join(
+            f"{question}: {answer}"
+            for question, answer in clarifying_answers.items()
+        )
+        user += f"\nDetails: {details}"
+    return [
+        {"role": "system", "content": COMPACT_THEME_PROFILE_SYSTEM_PROMPT},
+        {"role": "user", "content": user},
+    ]
+
+
 def parse_theme_profile_output(raw: str, theme: str) -> ThemeProfile:
     data = _extract_json_object(raw)
     motifs = data.get("motifs")

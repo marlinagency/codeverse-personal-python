@@ -28,6 +28,7 @@ from codeverse_core.theme_mapping.taxonomy_prompts import (
     MappableConcept,
     ThemeProfile,
     build_category_mapping_messages,
+    build_compact_theme_profile_messages,
     build_theme_profile_messages,
     parse_category_mapping_output,
     parse_theme_profile_output,
@@ -61,6 +62,7 @@ def generate_theme_profile(
     max_attempts: int = 3,
     fallback_on_failure: bool = False,
     clarifying_answers: dict[str, str] | None = None,
+    compact_prompt: bool = False,
 ) -> ThemeProfile:
     """Phase A: distill a free-text theme into a reusable ThemeProfile.
 
@@ -76,7 +78,12 @@ def generate_theme_profile(
     """
     last_error: Exception | None = None
     for attempt in range(1, max_attempts + 1):
-        messages = build_theme_profile_messages(theme, output_language, clarifying_answers)
+        message_builder = (
+            build_compact_theme_profile_messages
+            if compact_prompt
+            else build_theme_profile_messages
+        )
+        messages = message_builder(theme, output_language, clarifying_answers)
         try:
             # 2048, not 800: reasoning models (e.g. gpt-oss-120b) spend part
             # of the budget on hidden reasoning_content before the visible

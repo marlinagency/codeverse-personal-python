@@ -321,6 +321,7 @@ class TaxonomyThemeDictionaryGenerator:
         *,
         critical_overrides_enabled: bool = True,
         profile_fallback_on_failure: bool = True,
+        compact_profile_prompt: bool = False,
     ) -> TaxonomyThemeDictionary:
         """Fast app path: use the LLM once for theme motifs, then produce a
         complete, validated taxonomy dictionary deterministically.
@@ -339,6 +340,7 @@ class TaxonomyThemeDictionaryGenerator:
             max_attempts=self._max_attempts,
             fallback_on_failure=profile_fallback_on_failure,
             clarifying_answers=clarifying_answers,
+            compact_prompt=compact_profile_prompt,
         )
         profile = _harden_personal_profile(profile)
         batches, skipped = self._plan_batches(languages, concepts)

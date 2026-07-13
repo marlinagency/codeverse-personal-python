@@ -9,6 +9,7 @@ from codeverse_core.theme_mapping.taxonomy_prompts import (
     ThemeProfile,
     build_category_mapping_messages,
     build_theme_profile_messages,
+    build_compact_theme_profile_messages,
     chunk_mappable,
     extract_mappable,
     parse_category_mapping_output,
@@ -109,6 +110,20 @@ def test_theme_profile_messages_appends_clarifying_answers_after_theme_line():
     qa_index = body.index("Additional details from the user:")
     assert qa_index > theme_index
     assert "Which role?: Monster hunter" in body
+
+
+def test_compact_theme_profile_messages_are_small_and_skip_few_shots():
+    msgs = build_compact_theme_profile_messages(
+        "chess",
+        "en",
+        clarifying_answers={"Style?": "strategic"},
+    )
+
+    assert [message["role"] for message in msgs] == ["system", "user"]
+    assert "exactly 6" in msgs[0]["content"]
+    assert "Theme: chess" in msgs[1]["content"]
+    assert "Style?: strategic" in msgs[1]["content"]
+    assert sum(len(message["content"]) for message in msgs) < 1000
 
 
 def test_parse_theme_profile_output_happy_path():

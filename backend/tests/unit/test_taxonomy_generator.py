@@ -128,6 +128,33 @@ def test_profile_seeded_fast_path_can_skip_second_llm_batch():
     assert dictionary.mappings["py_fn_print"]
 
 
+def test_profile_seeded_compact_prompt_uses_student_contract():
+    profile = json.dumps(
+        {
+            "clean_theme": "Chess",
+            "motifs": ["pawn", "knight", "rook", "gambit", "checkmate", "castling"],
+            "tone": "strategic",
+            "output_language": "en",
+        }
+    )
+    provider = _StubProvider([profile])
+
+    dictionary = TaxonomyThemeDictionaryGenerator(provider, max_attempts=1).generate_profile_seeded(
+        "chess",
+        languages=("python",),
+        concepts=[_concept("if", kind="keyword", category="keywords", ids=("py_kw_if",))],
+        critical_overrides_enabled=False,
+        profile_fallback_on_failure=False,
+        compact_profile_prompt=True,
+    )
+
+    assert len(provider.calls) == 1
+    assert len(provider.calls[0]) == 2
+    assert "exactly 6" in provider.calls[0][0]["content"]
+    assert dictionary.profile.source == "llm"
+    assert dictionary.mappings["py_kw_if"]
+
+
 def test_profile_seeded_can_require_a_real_model_profile():
     provider = _StubProvider(["not valid json"])
 
