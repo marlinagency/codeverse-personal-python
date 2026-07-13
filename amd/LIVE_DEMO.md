@@ -59,5 +59,6 @@ Fireworks by product design; only the curated chips use the AMD student model.
 > GPU and generated the response ID shown here. The production backend received
 > the same response ID and output hash through our reverse tunnel. CodeVerse
 > then expanded that AMD-authored semantic profile into 210 validated Python
-> mappings. If the AMD model is unavailable, this chip path fails visibly; it
-> never falls back to Fireworks.
+> mappings. If the AMD instance is unavailable, the product remains online by
+> falling back to Fireworks, while its provenance clearly identifies which
+> engine actually answered.

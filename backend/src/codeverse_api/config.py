@@ -39,11 +39,11 @@ class Settings(BaseSettings):
     # --- AMD student model (fine-tuned on AMD Instinct, served via vLLM/tunnel) ---
     #: when true, curated theme chips are answered by our own AMD-hosted model;
     #: free-typed themes always use the primary provider above. AMD chip
-    #: failures stay visible and never masquerade as primary-provider output.
+    #: failures fall back to it and retain the primary provider provenance.
     amd_enabled: bool = False
     amd_base_url: str = "http://172.18.0.1:8001/v1"
     amd_model: str = "codeverse-student"
-    amd_timeout_seconds: float = 25.0
+    amd_timeout_seconds: float = 15.0
     amd_max_tokens: int = 160
 
     # --- Database ---

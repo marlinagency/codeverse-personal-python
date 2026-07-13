@@ -24,9 +24,10 @@ from codeverse_api.db.base import Base, get_db
 from codeverse_api.dependencies import get_llm_provider
 from codeverse_api.main import create_app
 from codeverse_api.security.auth import create_access_token
-from codeverse_api.config import get_settings
+from codeverse_api.config import Settings, get_settings
 from codeverse_core.personal_python import code_task_reference_solution
 from codeverse_core.theme_mapping.generator import TaxonomyThemeDictionary
+from codeverse_core.theme_mapping.llm_provider import LLMProviderError
 from codeverse_core.theme_mapping.providers.fake import FakeProvider
 
 
@@ -154,6 +155,36 @@ def test_generate_theme_creates_dictionary(client: TestClient):
     assert body["mappings"]["py_kw_if"]
     assert body["mappings"]["py_kw_for"]
     assert body["llm_provider"] == "fake"
+
+
+def test_amd_chip_falls_back_to_primary_provider_without_false_provenance(
+    client: TestClient,
+    monkeypatch,
+):
+    class _UnavailableAmdProvider:
+        provider_name = "openai_compatible"
+        model = "codeverse-student"
+
+        def chat(self, *_args, **_kwargs):
+            raise LLMProviderError("AMD tunnel unavailable")
+
+    client.app.dependency_overrides[get_settings] = lambda: Settings(amd_enabled=True)
+    monkeypatch.setattr(
+        "codeverse_api.routers.themes.build_amd_provider",
+        lambda _settings: _UnavailableAmdProvider(),
+    )
+    headers = _auth(client)
+
+    response = client.post(
+        "/themes/generate",
+        json={"theme": "chess", "output_language": "en", "use_amd": True},
+        headers=headers,
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["llm_provider"] == "fake"
+    assert body["llm_model"] != "codeverse-student"
 
 
 def test_generate_theme_rejects_empty_theme(client: TestClient):

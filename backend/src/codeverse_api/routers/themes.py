@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import replace
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -41,6 +42,7 @@ from codeverse_core.theme_mapping.taxonomy_generator import TaxonomyGenerationEr
 from codeverse_core.theme_mapping.validator import ThemeDictionaryValidationError
 
 router = APIRouter(prefix="/themes", tags=["themes"])
+logger = logging.getLogger("uvicorn.error")
 
 
 @router.post("/generate", response_model=ThemeDictionaryOut, status_code=status.HTTP_201_CREATED)
@@ -52,8 +54,8 @@ def generate_theme(
     provider: LLMProvider = Depends(get_llm_provider),
     settings: Settings = Depends(get_settings),
 ) -> ThemeDictionaryOut:
-    # Curated chips route exclusively to the AMD-hosted student model. Free
-    # text continues to use Fireworks through the primary generator below.
+    # Curated chips prefer the AMD-hosted student model. Free text always uses
+    # Fireworks; chips fall back to it only when AMD is unavailable.
     active_generator = generator
     active_provider = provider
     using_amd = body.use_amd and settings.amd_enabled
@@ -77,8 +79,8 @@ def generate_theme(
             # second 8k-token override batch adds latency without proving any
             # additional hardware usage.
             critical_overrides_enabled=not amd_fast_path,
-            # Never stamp deterministic fallback output as AMD-generated. If
-            # the student fails, return a visible AMD error instead.
+            # Never stamp deterministic fallback output as AMD-generated. A
+            # failed AMD request is caught below and rerun with Fireworks.
             profile_fallback_on_failure=not amd_fast_path,
             # Gemma only needs to author the semantic seed. The deterministic
             # concept engine expands it into the complete Python dictionary.
@@ -104,20 +106,16 @@ def generate_theme(
                 detail={"message": "theme dictionary could not be generated", "problems": problems},
             ) from exc
         if using_amd:
-            # AMD chips are a hardware/model proof path. Never disguise an
-            # unavailable student model by silently returning Fireworks data.
-            problems = getattr(exc, "problems", [str(exc)])
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail={
-                    "message": "the AMD-hosted codeverse-student model did not complete the request",
-                    "problems": problems,
-                    "provider": "openai_compatible",
-                    "model": settings.amd_model,
-                },
-            ) from exc
+            logger.warning(
+                "AMD_FALLBACK_TO_PRIMARY amd_model=%s primary_provider=%s reason=%s",
+                settings.amd_model,
+                provider.provider_name,
+                exc,
+            )
 
-        # Defensive fallback for any future non-AMD secondary provider.
+        # Retry once through the production provider. The saved provider/model
+        # provenance comes from this real response, so the UI never labels a
+        # Fireworks fallback as AMD-generated.
         active_generator = generator
         active_provider = provider
         try:

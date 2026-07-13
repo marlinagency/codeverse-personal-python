@@ -54,5 +54,6 @@ Clicking an AMD chip produces matching values in both places. This proves that
 the browser request crossed the tunnel and returned from `codeverse-student`
 on the AMD GPU.
 
-Chip clicks route exclusively to AMD and fail visibly when it is unavailable.
-Typed free text always uses the production Fireworks provider.
+Chip clicks prefer AMD and automatically fall back to Fireworks when the AMD
+instance or tunnel is unavailable. Typed free text always uses Fireworks. The
+saved provider/model fields and result badge identify which engine answered.
