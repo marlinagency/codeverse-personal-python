@@ -77,7 +77,7 @@ async def ws_execute(
         return
 
     try:
-        source, dictionary = resolve_source_and_dictionary(db, user_id, body)
+        source, dictionary, default_language = resolve_source_and_dictionary(db, user_id, body)
     except Exception as exc:  # noqa: BLE001 - surface as a ws error frame
         await websocket.send_json({"type": "error", "detail": str(exc)})
         await websocket.close()
@@ -85,7 +85,7 @@ async def ws_execute(
 
     started_at = datetime.now(timezone.utc)
     try:
-        compiled = pipeline.compile(source, dictionary)
+        compiled = pipeline.compile(source, dictionary, default_language=default_language)
     except CompilationError as exc:
         first = exc.diagnostics[0]
         await websocket.send_json(

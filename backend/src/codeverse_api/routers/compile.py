@@ -75,8 +75,13 @@ def resolve_source_and_dictionary(
     db: Session,
     user_id: uuid.UUID,
     body: CompileRequest,
-) -> tuple[str, ThemeDictionary]:
-    """Either load a saved project file, or compile ad-hoc unsaved content."""
+) -> tuple[str, ThemeDictionary, str]:
+    """Either load a saved project file, or compile ad-hoc unsaved content.
+
+    The third element is the fallback codegen language used only when the
+    source has no ``.cvl`` header: a saved file inherits its project's target
+    language, while ad-hoc editor content defaults to Python.
+    """
     if body.project_file_id is not None:
         file = ProjectRepository(db).get_file(body.project_file_id)
         if file is None:
@@ -89,7 +94,7 @@ def resolve_source_and_dictionary(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="theme dictionary not found"
             )
-        return file.source_content, ThemeRepository.to_domain(theme_row)
+        return file.source_content, ThemeRepository.to_domain(theme_row), project.target_language
 
     if body.source_content is None or body.theme_dictionary_id is None:
         raise HTTPException(
@@ -99,7 +104,7 @@ def resolve_source_and_dictionary(
     theme_row = ThemeRepository(db).get(body.theme_dictionary_id)
     if theme_row is None or theme_row.user_id != user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="theme dictionary not found")
-    return body.source_content, ThemeRepository.to_domain(theme_row)
+    return body.source_content, ThemeRepository.to_domain(theme_row), "python"
 
 
 @router.post("/compile", response_model=CompileResult)
@@ -109,11 +114,11 @@ def compile_source(
     db: Session = Depends(get_db),
     pipeline: CompilationPipeline = Depends(get_compilation_pipeline),
 ) -> CompileResult:
-    source, dictionary = resolve_source_and_dictionary(db, user_id, body)
-    trace = build_translation_trace(source, dictionary)
+    source, dictionary, default_language = resolve_source_and_dictionary(db, user_id, body)
+    trace = build_translation_trace(source, dictionary, default_language=default_language)
 
     try:
-        result = pipeline.compile(source, dictionary)
+        result = pipeline.compile(source, dictionary, default_language=default_language)
     except CompilationError as exc:
         first = exc.diagnostics[0]
         return CompileResult(

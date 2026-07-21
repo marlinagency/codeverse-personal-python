@@ -56,9 +56,19 @@ class CompilationPipeline:
     def __init__(self, error_translator: ErrorTranslator | None = None) -> None:
         self._error_translator = error_translator
 
-    def compile(self, cvl_content: str, dictionary: ThemeDictionary) -> CompilationResult:
+    def compile(
+        self,
+        cvl_content: str,
+        dictionary: ThemeDictionary,
+        *,
+        default_language: str = "python",
+    ) -> CompilationResult:
         try:
-            document = parse_cvl(cvl_content)
+            document = parse_cvl(
+                cvl_content,
+                default_theme=dictionary.theme,
+                default_language=default_language,
+            )
         except CvlFormatError as exc:
             raise CompilationError(
                 [self._diagnostic(exc.message, exc.line, 1, "format", dictionary)]

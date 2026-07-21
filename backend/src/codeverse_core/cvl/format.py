@@ -17,6 +17,13 @@ from dataclasses import dataclass
 
 SUPPORTED_FORMAT_VERSIONS = frozenset({1})
 
+#: Fallback header values used when the editor sends header-less source (the
+#: common "just type code and hit Run" case). ``@theme`` is informational only
+#: — the real theme comes from the ThemeDictionary passed to the pipeline — so
+#: any placeholder is fine; the language is what actually selects codegen.
+DEFAULT_HEADER_THEME = "canonical"
+DEFAULT_HEADER_LANGUAGE = "python"
+
 
 class CvlFormatError(Exception):
     def __init__(self, message: str, line: int = 1) -> None:
@@ -36,7 +43,43 @@ class CvlDocument:
     body_line_offset: int
 
 
-def parse_cvl(content: str) -> CvlDocument:
+def _is_headerless(content: str) -> bool:
+    """True when the first non-blank line is not an ``@key`` header line.
+
+    This is the "user typed plain code, no header" case. A partial or malformed
+    header (first real line starts with ``@``) is NOT header-less — those still
+    hit the strict parser so the user learns the exact format mistake.
+    """
+    for raw in content.split("\n"):
+        line = raw.strip()
+        if not line:
+            continue
+        return not line.startswith("@")
+    return True  # only blanks / empty: nothing to parse as a header
+
+
+def parse_cvl(
+    content: str,
+    *,
+    default_theme: str | None = None,
+    default_language: str | None = None,
+) -> CvlDocument:
+    """Parse a ``.cvl`` document.
+
+    When ``default_language`` is given and ``content`` has no header block, the
+    whole content is treated as the body and a default header is synthesized in
+    memory. ``body_line_offset`` stays 0 so diagnostics line up with what the
+    user sees in the editor (there is no header on screen to offset past).
+    """
+    if default_language is not None and _is_headerless(content):
+        return CvlDocument(
+            theme=default_theme or DEFAULT_HEADER_THEME,
+            language=default_language.lower(),
+            version=1,
+            body=content,
+            body_line_offset=0,
+        )
+
     lines = content.split("\n")
     header: dict[str, str] = {}
     separator_index: int | None = None

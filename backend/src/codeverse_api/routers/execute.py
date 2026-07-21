@@ -36,12 +36,12 @@ def execute_source(
     pipeline: CompilationPipeline = Depends(get_compilation_pipeline),
     sandbox: DockerSandboxRunner | None = Depends(get_sandbox_runner),
 ) -> ExecutionRunOut:
-    source, dictionary = resolve_source_and_dictionary(db, user_id, body)
-    trace = build_translation_trace(source, dictionary)
+    source, dictionary, default_language = resolve_source_and_dictionary(db, user_id, body)
+    trace = build_translation_trace(source, dictionary, default_language=default_language)
     started_at = datetime.now(timezone.utc)
 
     try:
-        compiled = pipeline.compile(source, dictionary)
+        compiled = pipeline.compile(source, dictionary, default_language=default_language)
     except CompilationError as exc:
         first = exc.diagnostics[0]
         return _persist_or_synthesize(

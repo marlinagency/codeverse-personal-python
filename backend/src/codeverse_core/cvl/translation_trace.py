@@ -49,10 +49,16 @@ def _python_token(token: Token) -> str | None:
 def build_translation_trace(
     cvl_content: str,
     dictionary: ThemeDictionary,
+    *,
+    default_language: str = "python",
 ) -> tuple[TranslationTraceLine, ...]:
     """Resolve only lexer-recognized tokens, preserving strings and comments."""
     try:
-        document = parse_cvl(cvl_content)
+        document = parse_cvl(
+            cvl_content,
+            default_theme=dictionary.theme,
+            default_language=default_language,
+        )
         tokens = Lexer(document.body, dictionary).tokenize()
     except (CvlFormatError, LexError):
         return ()

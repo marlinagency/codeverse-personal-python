@@ -605,7 +605,7 @@ def _module_source(dictionary: Any, module_id: str) -> str:
     header = f"@theme: {theme_name}\n@language: python\n@version: 1\n---\n"
 
     if module_id == "signals-and-values":
-        return header + f'{t["py_fn_print"]}("Personal Python ready")\ncv_score = 7\n{t["py_fn_print"]}(cv_score)\n'
+        return header + f'{t["py_fn_print"]}("hello")\ncv_score = 12\n{t["py_fn_print"]}(cv_score)\n'
 
     if module_id == "strings-and-text":
         return header + (
@@ -746,7 +746,7 @@ def _module_tasks(module_id: str, dictionary: Any) -> tuple[PracticeTask, ...]:
                 kind="predict_output",
                 concept_id="py_fn_print",
                 prompt=f"What appears first when `{t['py_fn_print']}` runs in this lesson?",
-                expected_answer="Personal Python ready",
+                expected_answer="hello",
                 hint="Look at the first output call in the lesson source.",
                 explanation="print displays its argument on a new output line.",
             ),
@@ -1714,7 +1714,7 @@ def _code_header(dictionary: Any) -> str:
 
 
 _TASK_ANSWERS: dict[str, tuple[str, ...]] = {
-    "signals-output": ("Personal Python ready",),
+    "signals-output": ("hello",),
     "signals-translate": ("print",),
     "signals-number-expression": ("8", "eight"),
     "signals-variable-update": ("9", "nine"),
@@ -2598,9 +2598,9 @@ def _lesson_sections(module_id: str, dictionary: Any) -> tuple[LessonSection, ..
                 "Text literals need quotes; numeric literals do not.",
                 "The personal token changes the cue, not Python's output behavior.",
             ),
-            personal_example=f'{output}("Personal Python ready")',
-            real_python_example='print("Personal Python ready")',
-            expected_output="Personal Python ready\n",
+            personal_example=f'{output}("hello")',
+            real_python_example='print("hello")',
+            expected_output="hello\n",
         ),
         LessonSection(
             section_id="signals-values-and-types",
@@ -2823,7 +2823,7 @@ def _success_criteria(module_id: str) -> tuple[str, ...]:
 
 def _real_python_preview(module_id: str) -> str:
     previews = {
-        "signals-and-values": 'print("Personal Python ready")\ncv_score = 7\nprint(cv_score)\n',
+        "signals-and-values": 'print("hello")\ncv_score = 12\nprint(cv_score)\n',
         "strings-and-text": (
             'cv_message = "  codeverse, python  "\n'
             'cv_clean = cv_message.strip().replace(",", "").upper()\n'
@@ -2928,7 +2928,7 @@ def _real_python_preview(module_id: str) -> str:
 
 def _expected_stdout(module_id: str) -> str:
     outputs = {
-        "signals-and-values": "Personal Python ready\n7\n",
+        "signals-and-values": "hello\n12\n",
         "strings-and-text": "CODEVERSE PYTHON\n['codeverse', 'python']\n2026\n",
         "numbers-and-conversion": "37.5\n8\n8\n",
         "imports-and-library": "9.0\n4\n",

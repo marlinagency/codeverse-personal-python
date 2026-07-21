@@ -116,7 +116,7 @@ def test_learning_modules_compile_and_run_for_core_path():
     pipeline = CompilationPipeline()
 
     for module_id, expected_stdout in {
-        "signals-and-values": "Personal Python ready\n7\n",
+        "signals-and-values": "hello\n12\n",
         "strings-and-text": "CODEVERSE PYTHON\n['codeverse', 'python']\n2026\n",
         "numbers-and-conversion": "37.5\n8\n8\n",
         "imports-and-library": "9.0\n4\n",
