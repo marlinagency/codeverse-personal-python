@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import subprocess
 import sys
 import tempfile
@@ -11,6 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from codeverse_api.config import Settings, get_settings
 from codeverse_api.dependencies import get_compilation_pipeline, get_db, get_sandbox_runner
 from codeverse_api.repositories.execution_repository import ExecutionRepository
 from codeverse_api.routers.compile import diagnostic_out, resolve_source_and_dictionary, trace_out
@@ -27,6 +29,33 @@ from codeverse_sandbox.limits import SandboxLimits
 
 router = APIRouter(tags=["execute"])
 
+logger = logging.getLogger(__name__)
+
+
+def guard_unsandboxed_execution(settings: Settings) -> None:
+    """Fail closed unless the UNSANDBOXED host fallback is permitted here.
+
+    The Docker sandbox is the only isolated way to run user code. When it is
+    unreachable we must NOT silently run arbitrary user code on the host in
+    production or on the public-demo site — we raise 503 instead. The host
+    subprocess fallback stays available only on a developer's own machine
+    (see ``Settings.unsandboxed_execution_permitted``).
+    """
+    if settings.unsandboxed_execution_permitted:
+        logger.warning(
+            "Docker sandbox unavailable — running user code via the UNSANDBOXED "
+            "host fallback. This is only safe in local development."
+        )
+        return
+    logger.error(
+        "Docker sandbox unavailable and unsandboxed host execution is forbidden "
+        "in this environment (production/public-demo); refusing to run user code."
+    )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Code execution is temporarily unavailable (sandbox offline). Please try again shortly.",
+    )
+
 
 @router.post("/execute", response_model=ExecutionRunOut)
 def execute_source(
@@ -35,6 +64,7 @@ def execute_source(
     db: Session = Depends(get_db),
     pipeline: CompilationPipeline = Depends(get_compilation_pipeline),
     sandbox: DockerSandboxRunner | None = Depends(get_sandbox_runner),
+    settings: Settings = Depends(get_settings),
 ) -> ExecutionRunOut:
     source, dictionary, default_language = resolve_source_and_dictionary(db, user_id, body)
     trace = build_translation_trace(source, dictionary, default_language=default_language)
@@ -61,6 +91,7 @@ def execute_source(
 
     limits = SandboxLimits()
     if sandbox is None:
+        guard_unsandboxed_execution(settings)
         local = run_local_python_demo(
             compiled.codegen.target_language,
             compiled.codegen.source_code,

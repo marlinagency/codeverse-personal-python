@@ -22,6 +22,7 @@ git clone <YOUR_GITHUB_REPO_URL> codeverse && cd codeverse
 
 # config — create .env at the repo root:
 cat > .env <<'EOF'
+CODEVERSE_ENVIRONMENT=production
 CODEVERSE_LLM_PROVIDER=fireworks
 CODEVERSE_FIREWORKS_API_KEY=<your fw_ key>
 CODEVERSE_FIREWORKS_MODEL=accounts/fireworks/models/glm-5p2
@@ -55,6 +56,11 @@ docker compose up -d --build
 - The backend applies Alembic migrations automatically before it starts.
   PostgreSQL and FastAPI stay private inside Compose; only nginx port 80 is
   published to the internet.
+- **Fail-closed execution:** with `CODEVERSE_ENVIRONMENT=production` (or
+  `CODEVERSE_PUBLIC_DEMO=1`), if the Docker sandbox is ever unreachable the
+  code-execution endpoints return **503** instead of running user code
+  unsandboxed on the host. Keep the sandbox runtime images built (step above)
+  and the Docker daemon healthy, or execution will be unavailable by design.
 - Update flow: `git pull && docker compose up -d --build`.
 - Rough cost: a small CPU droplet runs weeks on the $100 credit; visitor
   theme generations cost ~1-2 Fireworks cents each.

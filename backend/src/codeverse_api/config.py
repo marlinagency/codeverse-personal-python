@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_DEFAULT_JWT_SECRET = "change-me-in-production"
 
 
 class Settings(BaseSettings):
@@ -14,6 +17,12 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    # --- Environment / runtime safety ---
+    #: "development" | "production". Production refuses unsafe defaults (see
+    #: the validator below) and, together with ``public_demo``, forbids the
+    #: unsandboxed host-execution fallback (see ``unsandboxed_execution_permitted``).
+    environment: str = "development"
 
     # --- Deployment ---
     #: comma-separated browser origins allowed by CORS (dev default: Vite)
@@ -50,7 +59,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://codeverse:codeverse@localhost:5432/codeverse"
 
     # --- Auth ---
-    jwt_secret: str = "change-me-in-production"
+    jwt_secret: str = _DEFAULT_JWT_SECRET
     jwt_expire_minutes: int = 1440
     jwt_algorithm: str = "HS256"
 
@@ -59,6 +68,32 @@ class Settings(BaseSettings):
     sandbox_memory_limit: str = "256m"
     sandbox_cpu_limit: float = 1.0
     sandbox_pids_limit: int = 64
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.strip().lower() == "production"
+
+    @property
+    def unsandboxed_execution_permitted(self) -> bool:
+        """Whether user code may run via the UNSANDBOXED host subprocess fallback.
+
+        The host fallback (``run_local_python_demo``) has no container, network,
+        filesystem, or resource isolation. It is only ever acceptable on a
+        developer's own machine. It must never run in production or on the
+        public-demo site, where anonymous visitors submit arbitrary code — a
+        transient Docker outage there must fail closed (503), not silently
+        downgrade to executing untrusted code on the host.
+        """
+        return not (self.is_production or self.public_demo)
+
+    @model_validator(mode="after")
+    def _enforce_runtime_safety(self) -> "Settings":
+        if self.is_production and self.jwt_secret == _DEFAULT_JWT_SECRET:
+            raise ValueError(
+                "CODEVERSE_JWT_SECRET must be set to a strong random value in "
+                "production (the built-in default is public and insecure)."
+            )
+        return self
 
 
 @lru_cache

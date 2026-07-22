@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 from codeverse_api.dependencies import get_compilation_pipeline, get_db, get_sandbox_runner
 from codeverse_api.repositories.progress_repository import ProgressRepository
 from codeverse_api.repositories.theme_repository import ThemeRepository
-from codeverse_api.routers.execute import run_local_python_demo
+from codeverse_api.config import Settings, get_settings
+from codeverse_api.routers.execute import guard_unsandboxed_execution, run_local_python_demo
 from codeverse_api.schemas.learning import (
     AssessmentConceptScoreOut,
     AssessmentQuestionOut,
@@ -132,6 +133,7 @@ def run_practice_code(
     db: Session = Depends(get_db),
     pipeline: CompilationPipeline = Depends(get_compilation_pipeline),
     sandbox: DockerSandboxRunner | None = Depends(get_sandbox_runner),
+    settings: Settings = Depends(get_settings),
 ) -> PracticeRunOut:
     """Behavioral check for write_code exercises: compile the student's
     Personal Python source with THEIR dictionary, actually run it, and
@@ -190,8 +192,10 @@ def run_practice_code(
             )
             run = {"status": result.status, "stdout": result.stdout, "stderr_raw": result.stderr or None}
         except DockerSandboxError:
+            guard_unsandboxed_execution(settings)
             run = run_local_python_demo("python", source_code, limits)
     else:
+        guard_unsandboxed_execution(settings)
         run = run_local_python_demo("python", source_code, limits)
 
     stdout = str(run.get("stdout") or "")
@@ -399,6 +403,7 @@ def check_bridge_submission(
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: Session = Depends(get_db),
     sandbox: DockerSandboxRunner | None = Depends(get_sandbox_runner),
+    settings: Settings = Depends(get_settings),
 ) -> BridgeCheckOut:
     """Graduation check: the submission must run as PLAIN Python (not compiled
     through the theme dictionary), print the goal output, and contain none of
@@ -437,8 +442,10 @@ def check_bridge_submission(
             result = sandbox.run(language="python", source_code=source, limits=limits)
             run = {"status": result.status, "stdout": result.stdout, "stderr_raw": result.stderr or None}
         except DockerSandboxError:
+            guard_unsandboxed_execution(settings)
             run = run_local_python_demo("python", source, limits)
     else:
+        guard_unsandboxed_execution(settings)
         run = run_local_python_demo("python", source, limits)
 
     stdout = str(run.get("stdout") or "")

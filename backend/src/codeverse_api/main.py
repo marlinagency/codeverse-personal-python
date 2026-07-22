@@ -31,8 +31,8 @@ def create_app() -> FastAPI:
             if origin.strip()
         ],
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     app.include_router(auth_router.router)
