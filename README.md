@@ -163,6 +163,10 @@ docker compose up -d --build
 
 See [DEPLOY.md](DEPLOY.md) for environment variables, runtime images, health checks, and update steps.
 
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
 ---
 
 <div align="center">
