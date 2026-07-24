@@ -92,7 +92,7 @@ def generate_theme_profile(
             # turns on forced JSON mode — both made every real call fail and
             # silently fall back to the curated tables instead of actually
             # analyzing the user's text.
-            raw = provider.chat(messages, temperature=0.7, max_tokens=2048)
+            raw = provider.chat(messages, temperature=0.55, max_tokens=2048)
             return parse_theme_profile_output(raw, theme)
         except Exception as exc:  # noqa: BLE001 - provider failures can use fallback
             last_error = exc
@@ -424,7 +424,7 @@ def generate_batch_mapping(
         messages = build_category_mapping_messages(
             profile, batch, forbidden_tokens, correction_feedback=feedback
         )
-        raw = provider.chat(messages, temperature=0.8, max_tokens=2048)
+        raw = provider.chat(messages, temperature=0.4, max_tokens=2048)
         try:
             return parse_category_mapping_output(raw, batch)
         except ValueError as exc:

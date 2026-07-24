@@ -680,7 +680,10 @@ class TaxonomyThemeDictionaryGenerator:
                 forbidden_tokens,
                 correction_feedback=feedback,
             )
-            raw = self._provider.chat(messages, temperature=0.8, max_tokens=8192)
+            # Low temperature: token invention is a constrained task (valid,
+            # unique, non-generic identifiers), so sampling variety mostly
+            # produces rejects and retries rather than better names.
+            raw = self._provider.chat(messages, temperature=0.4, max_tokens=8192)
             try:
                 result = parse_category_mapping_output(raw, list(batch.concepts))
                 problems = self._validate_batch_result(

@@ -300,7 +300,7 @@ def test_taxonomy_generator_retries_with_feedback_for_duplicate_tokens():
     assert dictionary.mappings["python_strings_lower"] == "sessiz"
     assert dictionary.batches[0].attempts == 2
     retry_prompt = provider.calls[2][-1]["content"]
-    assert "previous attempt was rejected" in retry_prompt
+    assert "previous tokens were rejected" in retry_prompt
     assert "duplicate token" in retry_prompt
 
 

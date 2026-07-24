@@ -595,6 +595,10 @@ Rules:
 - One identifier: letters, digits, underscores; no digit start; no spaces/punctuation. snake_case.
 - Must be distinct, and not in the FORBIDDEN list.
 - No real programming keywords or built-ins.
+- Never use bare tech/meta words as a token or a token part: code, coding,
+  program, script, syntax, token, variable, helper, config, console, debug,
+  terminal, loop, iteration, print, statement, python, generic, thing, stuff.
+  Reach for vivid, concrete nouns from the theme instead.
 - Do not mechanically append the canonical name or concept_id (bad: sign_if,
   ship_select, castle_len). The token itself must be a themed metaphor for
   what the construct does.
@@ -664,8 +668,11 @@ def build_category_mapping_messages(
     ]
     if correction_feedback:
         user_parts.append(
-            "Your previous attempt was rejected by the validator. Fix exactly "
-            f"these problems and answer again:\n{correction_feedback}"
+            "Your previous tokens were rejected. For EACH problem below, replace "
+            "ONLY that token with a fresh, vivid theme metaphor — not a generic "
+            "word, not a real keyword, not the construct's own name — and keep "
+            "every other token the same. Then answer with the full JSON again:\n"
+            f"{correction_feedback}"
         )
 
     return [
